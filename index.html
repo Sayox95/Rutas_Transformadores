@@ -82,6 +82,10 @@ body{display:flex}
 #calc-btn{width:100%;padding:10px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
 #calc-btn:hover{background:#e09515;transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,166,35,.3)}
 #calc-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+.cache-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px}
+.cache-btn{padding:7px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:7px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s}
+.cache-btn:hover{border-color:var(--accent);color:var(--accent)}
+.cache-status{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:6px;line-height:1.35}
 
 /* ─── LOADING ─── */
 #loading{display:none;flex-direction:column;align-items:center;padding:12px 16px;gap:7px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
@@ -300,6 +304,11 @@ body{display:flex}
         <button class="n-btn" data-n="4">4</button>
       </div>
       <button id="calc-btn" disabled>📂 Cargá un CSV para calcular</button>
+      <div class="cache-actions">
+        <button class="cache-btn" id="recalc-btn" disabled>↻ Recalcular desde cero</button>
+        <button class="cache-btn" id="clear-cache-btn">🧹 Limpiar caché OSRM</button>
+      </div>
+      <div class="cache-status" id="cache-status">Caché OSRM local: listo.</div>
     </div>
 
   </div><!-- /ctrl -->
@@ -372,6 +381,7 @@ let numRoutes = 2;
 let gRoutes=[], gSchedules=[], gAllPts=null;
 let gRouteLayers=[], gPreviewMarkers=[];
 let baseMarker=null;
+let forceRecalculateOSRM=false;
 
 // ══════════════════════════════════════════════════════════════
 //  MAP INIT
@@ -427,7 +437,14 @@ document.querySelectorAll('.n-btn').forEach(btn=>{
 document.getElementById('cfg-lunch').addEventListener('change',e=>{
   document.getElementById('lunch-fields').classList.toggle('hidden',!e.target.checked);
 });
-document.getElementById('calc-btn').addEventListener('click',calculateAll);
+document.getElementById('calc-btn').addEventListener('click',()=>{forceRecalculateOSRM=false;calculateAll();});
+document.getElementById('recalc-btn').addEventListener('click',async()=>{
+  if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
+  forceRecalculateOSRM=true;
+  await clearOSRMCache(false);
+  calculateAll();
+});
+document.getElementById('clear-cache-btn').addEventListener('click',()=>clearOSRMCache(true));
 document.getElementById('export-btn').addEventListener('click',exportCSV);
 
 // Base apply
@@ -516,6 +533,105 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 // ── OSRM helpers ──────────────────────────────────────────────
 // The public OSRM demo server has usage limits and may hang/timeout.
 // Keep calls controlled: timeout every fetch, retry failures, and avoid parallel walking requests.
+
+// ══════════════════════════════════════════════════════════════
+//  LOCAL OSRM CACHE — IndexedDB
+//  Guarda geometrías OSRM por transformador para poder reanudar.
+// ══════════════════════════════════════════════════════════════
+const OSRM_CACHE_DB='inspeccion_transformadores_osrm_cache_v1';
+const OSRM_CACHE_STORE='walking_routes';
+let osrmCacheDbPromise=null;
+
+function setCacheStatus(msg){
+  const el=document.getElementById('cache-status');
+  if(el) el.textContent=msg;
+}
+
+function openOSRMCache(){
+  if(osrmCacheDbPromise) return osrmCacheDbPromise;
+  osrmCacheDbPromise=new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){
+      reject(new Error('IndexedDB no está disponible en este navegador'));
+      return;
+    }
+    const req=indexedDB.open(OSRM_CACHE_DB,1);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(OSRM_CACHE_STORE)){
+        db.createObjectStore(OSRM_CACHE_STORE,{keyPath:'key'});
+      }
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error || new Error('No se pudo abrir IndexedDB'));
+  });
+  return osrmCacheDbPromise;
+}
+
+function simpleHash(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){
+    h^=str.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return (h>>>0).toString(36);
+}
+
+function buildWalkingCacheKey(grp){
+  const pts=[grp.trafo,...grp.apoyos].map(p=>({
+    id:p.idApoyo||p.idTrafo||'',
+    lat:+Number(p.lat).toFixed(7),
+    lon:+Number(p.lon).toFixed(7)
+  }));
+  return `walking:${grp.id}:${simpleHash(JSON.stringify(pts))}`;
+}
+
+async function getCachedWalkingRoute(key){
+  const db=await openOSRMCache();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(OSRM_CACHE_STORE,'readonly');
+    const req=tx.objectStore(OSRM_CACHE_STORE).get(key);
+    req.onsuccess=()=>resolve(req.result || null);
+    req.onerror=()=>reject(req.error || new Error('Error leyendo caché OSRM'));
+  });
+}
+
+async function setCachedWalkingRoute(record){
+  const db=await openOSRMCache();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(OSRM_CACHE_STORE,'readwrite');
+    tx.objectStore(OSRM_CACHE_STORE).put(record);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error || new Error('Error guardando caché OSRM'));
+  });
+}
+
+async function clearOSRMCache(showMsg=true){
+  try{
+    const db=await openOSRMCache();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(OSRM_CACHE_STORE,'readwrite');
+      tx.objectStore(OSRM_CACHE_STORE).clear();
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error || new Error('No se pudo limpiar caché'));
+    });
+    setCacheStatus('Caché OSRM local: limpio.');
+    if(showMsg) toast('Caché OSRM limpiado.');
+  }catch(err){
+    console.error(err);
+    if(showMsg) toast('No se pudo limpiar caché OSRM: '+err.message);
+  }
+}
+
+function applyCachedWalkingRoute(grp,cached){
+  grp.walkFallback=false;
+  grp.walkFallbackReason='';
+  grp.walkTime=cached.walkTime;
+  grp.walkGeom=cached.walkGeom;
+  grp.walkOrder=cached.walkOrder;
+  grp.totalTime=grp.inspTime+grp.walkTime;
+  grp.osrmCached=true;
+}
+
 const OSRM_TIMEOUT_MS = 15000;
 const OSRM_RETRY_WAIT_MS = 2500;
 const OSRM_REQUEST_GAP_MS = 900;
@@ -608,6 +724,7 @@ async function computeGroupWalking(grp){
   const pts=[grp.trafo,...grp.apoyos];
   grp.walkFallback=false;
   grp.walkFallbackReason='';
+  grp.osrmCached=false;
 
   if(pts.length<=1){
     grp.walkTime=0; grp.walkGeom=null; grp.walkOrder=pts;
@@ -615,9 +732,23 @@ async function computeGroupWalking(grp){
   }
 
   const label=`Trafo ${grp.id}`;
+  const cacheKey=buildWalkingCacheKey(grp);
+
+  if(!forceRecalculateOSRM){
+    try{
+      const cached=await getCachedWalkingRoute(cacheKey);
+      if(cached && cached.walkGeom && Array.isArray(cached.walkOrder)){
+        applyCachedWalkingRoute(grp,cached);
+        return;
+      }
+    }catch(cacheErr){
+      console.warn('No se pudo leer caché OSRM:', cacheErr);
+      setCacheStatus('Caché OSRM local: no disponible, calculando directo.');
+    }
+  }
+
   const mat=await osrmWalkingTable(pts, `${label} · tabla walking`);
 
-  // TSP — vecino más cercano empezando en transformador (índice 0)
   const order=[0];
   const rem=new Set(pts.map((_,i)=>i).slice(1));
   while(rem.size>0){
@@ -631,7 +762,6 @@ async function computeGroupWalking(grp){
     order.push(best); rem.delete(best);
   }
 
-  // 2-opt improvement usando únicamente matriz OSRM
   let imp=true;
   while(imp){
     imp=false;
@@ -652,11 +782,25 @@ async function computeGroupWalking(grp){
 
   grp.walkOrder=order.map(i=>pts[i]);
 
-  // Geometría real OSRM. Si falla, NO se usa línea recta: se detiene con error.
   const rd=await osrmWalkingRoute(grp.walkOrder, `${label} · ruta walking`);
   grp.walkTime=rd.duration/60;
   grp.walkGeom=rd.geom;
   grp.totalTime=grp.inspTime+grp.walkTime;
+
+  try{
+    await setCachedWalkingRoute({
+      key:cacheKey,
+      idTrafo:grp.id,
+      walkTime:grp.walkTime,
+      walkGeom:grp.walkGeom,
+      walkOrder:grp.walkOrder,
+      createdAt:new Date().toISOString()
+    });
+    setCacheStatus(`Caché OSRM local: guardado Trafo ${grp.id}.`);
+  }catch(cacheErr){
+    console.warn('No se pudo guardar caché OSRM:', cacheErr);
+    setCacheStatus('Caché OSRM local: no se pudo guardar, cálculo continúa.');
+  }
 }
 
 async function computeAllGroupWalking(groups, onProgress){
@@ -664,8 +808,9 @@ async function computeAllGroupWalking(groups, onProgress){
     const grp=groups[i];
     onProgress(i, groups.length, `Calculando OSRM para transformador ${grp.id}...`);
     await computeGroupWalking(grp);
-    onProgress(i+1, groups.length, `OSRM completado para transformador ${grp.id}`);
-    await sleep(OSRM_REQUEST_GAP_MS);
+    const src=grp.osrmCached ? 'caché local' : 'OSRM';
+    onProgress(i+1, groups.length, `Ruta ${src} completada para transformador ${grp.id}`);
+    if(!grp.osrmCached) await sleep(OSRM_REQUEST_GAP_MS);
   }
 }
 
@@ -715,6 +860,7 @@ function showLoadedState(fname){
   const btn=document.getElementById('calc-btn');
   btn.disabled=false;
   btn.innerHTML='⚡ Calcular Rutas y Cronograma';
+  document.getElementById('recalc-btn').disabled=false;
 }
 
 function clearCSV(){
@@ -726,6 +872,7 @@ function clearCSV(){
   const btn=document.getElementById('calc-btn');
   btn.disabled=true;
   btn.innerHTML='📂 Cargá un CSV para calcular';
+  document.getElementById('recalc-btn').disabled=true;
   gPreviewMarkers.forEach(m=>map.removeLayer(m));
   gPreviewMarkers=[];
 }
@@ -763,7 +910,11 @@ function haversineKm(lat1,lon1,lat2,lon2){
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 function setProgress(pct,msg){document.getElementById('pbar').style.width=pct+'%';document.getElementById('load-msg').textContent=msg;}
-function showLoading(on){document.getElementById('loading').classList[on?'add':'remove']('show');document.getElementById('calc-btn').disabled=on;}
+function showLoading(on){
+  document.getElementById('loading').classList[on?'add':'remove']('show');
+  document.getElementById('calc-btn').disabled=on;
+  document.getElementById('recalc-btn').disabled=on || !GROUPS.length;
+}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',5000);}
 
 // ══════════════════════════════════════════════════════════════
@@ -1036,6 +1187,7 @@ async function calculateAll(){
 
     setProgress(15,'Calculando rutas a pie entre apoyos (OSRM walking)...');
     computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
+    setCacheStatus(forceRecalculateOSRM ? 'Caché OSRM local: ignorado para recálculo.' : 'Caché OSRM local: consultando rutas guardadas...');
     await computeAllGroupWalking(GROUPS,(done,total,msg)=>{
       const pct = total ? 15+Math.round((done/total)*20) : 15;
       setProgress(pct, msg || `Rutas a pie OSRM: ${done}/${total} transformadores...`);
@@ -1154,6 +1306,8 @@ async function calculateAll(){
 
     map.fitBounds([...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]],{padding:[30,30]});
     setProgress(100,'¡Listo!');
+    setCacheStatus('Caché OSRM local: cálculo finalizado.');
+    forceRecalculateOSRM=false;
     showLoading(false);
     document.getElementById('export-strip').style.display='block';
     document.getElementById('export-btn').disabled=false;
