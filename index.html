@@ -359,11 +359,12 @@ async function d1Save(grp, batchId, apiBase) {
   }, 20000);
 }
 
-// ── OSRM Walking ─────────────────────────────────────────────
-async function osrmTable(pts) {
+// ── OSRM Walking (via proxy — evita CORS desde el Worker) ───
+async function osrmTable(pts, proxyBase) {
   const coords = pts.map(p => p.lon + ',' + p.lat).join(';');
+  const url = proxyBase + '/table?coords=' + encodeURIComponent(coords) + '&annotations=duration&mode=walking';
   return withRetry(async () => {
-    const res = await fetchT('https://router.project-osrm.org/table/v1/walking/' + coords + '?annotations=duration');
+    const res = await fetchT(url);
     if (!res.ok) throw new Error('walking table HTTP ' + res.status);
     const d = await res.json();
     if (d.code !== 'Ok' || !Array.isArray(d.durations) || !d.durations.length)
@@ -372,10 +373,11 @@ async function osrmTable(pts) {
   }, 'Trafo ' + grp.id + ' table');
 }
 
-async function osrmRoute(pts) {
+async function osrmRoute(pts, proxyBase) {
   const coords = pts.map(p => p.lon + ',' + p.lat).join(';');
+  const url = proxyBase + '/route?coords=' + encodeURIComponent(coords) + '&mode=walking&overview=full&geometries=geojson';
   return withRetry(async () => {
-    const res = await fetchT('https://router.project-osrm.org/route/v1/walking/' + coords + '?overview=full&geometries=geojson');
+    const res = await fetchT(url);
     if (!res.ok) throw new Error('walking route HTTP ' + res.status);
     const d = await res.json();
     if (d.code !== 'Ok' || !d.routes || !d.routes[0])
@@ -416,13 +418,10 @@ function twoOptWalk(mat, order) {
   return r;
 }
 
-// ── Procesar un grupo ─────────────────────────────────────────
-let grp; // referencia global para closures de OSRM
-async function processGroup(g, batchId, apiBase, force) {
+async function processGroup(g, batchId, apiBase, proxyBase, force) {
   grp = g;
   const pts = [grp.trafo, ...grp.apoyos];
 
-  // Sin apoyos extra: solo el trafo, no hay walking
   if (pts.length <= 1) {
     grp.walkTime  = 0;
     grp.walkOrder = pts;
@@ -447,16 +446,16 @@ async function processGroup(g, batchId, apiBase, force) {
     }
   }
 
-  // 2. OSRM tabla walking
-  const mat = await osrmTable(pts);
+  // 2. OSRM tabla walking (via proxy)
+  const mat = await osrmTable(pts, proxyBase);
 
   // 3. TSP NN + 2-opt
   const order     = nnWalk(mat, pts.length);
   const optimized = twoOptWalk(mat, order);
   grp.walkOrder   = optimized.map(i => pts[i]);
 
-  // 4. OSRM ruta walking (tiempo real + geometría)
-  const rd      = await osrmRoute(grp.walkOrder);
+  // 4. OSRM ruta walking (via proxy)
+  const rd      = await osrmRoute(grp.walkOrder, proxyBase);
   grp.walkTime  = rd.duration / 60;
   grp.walkGeom  = rd.geom;
   grp.fromCache = false;
@@ -475,7 +474,7 @@ async function processGroup(g, batchId, apiBase, force) {
 // ── Manejador de mensajes ─────────────────────────────────────
 self.onmessage = async function (e) {
   if (e.data.type !== 'start') return;
-  const { groups, batchId, apiBase, force } = e.data;
+  const { groups, batchId, apiBase, proxyBase, force } = e.data;
   const total = groups.length;
   let done = 0, fromCache = 0, fromOSRM = 0;
 
@@ -485,7 +484,7 @@ self.onmessage = async function (e) {
       msg: 'Trafo ' + g.id + ' · ' + i + '/' + total + ' · D1:' + fromCache + ' · OSRM:' + fromOSRM });
 
     try {
-      await processGroup(g, batchId, apiBase, force);
+      await processGroup(g, batchId, apiBase, proxyBase, force);
       if (g.fromCache) fromCache++; else fromOSRM++;
       done++;
       // Devolver resultado al hilo principal
@@ -858,7 +857,8 @@ function buildHaversineMatrix(pts, tf) {
 async function osrmDriving(pts) {
   const call = async chunk => {
     const coords = chunk.map(p=>`${p.lon},${p.lat}`).join(';');
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const url = `${window.location.origin}${API_BASE}/proxy/route?coords=${encodeURIComponent(coords)}&mode=driving&overview=full&geometries=geojson`;
+    const res = await fetch(url);
     if (!res.ok) throw new Error('driving HTTP ' + res.status);
     const d = await res.json();
     if (d.code !== 'Ok') throw new Error('OSRM driving: ' + d.message);
@@ -929,8 +929,9 @@ function runWorker(groups, batchId, force) {
       apoyos:  g.apoyos.map(a => ({ idApoyo: a.idApoyo, lat: a.lat, lon: a.lon, clientes: a.clientes }))
     }));
 
-    const apiBase = window.location.origin + API_BASE;
-    activeWorker.postMessage({ type: 'start', groups: data, batchId, apiBase, force });
+    const apiBase   = window.location.origin + API_BASE;
+    const proxyBase = window.location.origin + API_BASE + '/proxy';
+    activeWorker.postMessage({ type: 'start', groups: data, batchId, apiBase, proxyBase, force });
   });
 }
 
