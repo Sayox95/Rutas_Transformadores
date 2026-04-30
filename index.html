@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
-<head> 
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspección Transformadores - Corregido v2</title>
@@ -546,7 +546,7 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 //  Guarda geometrías OSRM por transformador en D1 para poder reanudar.
 // ══════════════════════════════════════════════════════════════
 const OSRM_CACHE_API_BASE = '/api/osrm';
-const OSRM_PARALLEL_GROUPS = 3;
+const OSRM_PARALLEL_GROUPS = 1;
 
 function setCacheStatus(msg){
   const el=document.getElementById('cache-status');
@@ -850,19 +850,21 @@ async function computeAllGroupWalking(groups, onProgress){
   let fromCache=0;
   let fromOSRM=0;
 
-  for(let i=0;i<groups.length;i+=OSRM_PARALLEL_GROUPS){
-    const batch=groups.slice(i,i+OSRM_PARALLEL_GROUPS);
-    onProgress(done,total,`Procesando lote OSRM ${Math.floor(i/OSRM_PARALLEL_GROUPS)+1} · ${done}/${total} completados...`);
+  // Modo conservador: 1 transformador por vez.
+  // Evita Promise.all para que una llamada lenta a OSRM no deje un lote completo bloqueado
+  // y reduce la presión sobre el navegador y sobre router.project-osrm.org.
+  for(let i=0;i<groups.length;i++){
+    const grp=groups[i];
+    onProgress(done,total,`Procesando Trafo ${grp.id} · ${done}/${total} completados...`);
 
-    await Promise.all(batch.map(async(grp)=>{
-      await computeGroupWalking(grp);
-      if(grp.osrmCached) fromCache++; else fromOSRM++;
-      done++;
-      onProgress(done,total,`Completado ${done}/${total} · D1: ${fromCache} · OSRM nuevos: ${fromOSRM}`);
-    }));
+    await computeGroupWalking(grp);
 
-    // Pequeña pausa entre lotes para no presionar el OSRM público.
-    if(i+OSRM_PARALLEL_GROUPS<groups.length) await sleep(OSRM_REQUEST_GAP_MS);
+    if(grp.osrmCached) fromCache++; else fromOSRM++;
+    done++;
+    onProgress(done,total,`Completado ${done}/${total} · D1: ${fromCache} · OSRM nuevos: ${fromOSRM}`);
+
+    // Pausa corta entre transformadores nuevos/consultados para no presionar el OSRM público.
+    if(i<groups.length-1) await sleep(OSRM_REQUEST_GAP_MS);
   }
 }
 
