@@ -10,7 +10,7 @@ function json(data, status = 200) {
   });
 }
 
-export async function onRequestOptions() {
+export async function onRequestOptions() { 
   return json({ ok: true });
 }
 
