@@ -306,9 +306,9 @@ body{display:flex}
       <button id="calc-btn" disabled>📂 Cargá un CSV para calcular</button>
       <div class="cache-actions">
         <button class="cache-btn" id="recalc-btn" disabled>↻ Recalcular desde cero</button>
-        <button class="cache-btn" id="clear-cache-btn">🧹 Limpiar caché OSRM</button>
+        <button class="cache-btn" id="clear-cache-btn">🧹 Limpiar caché D1</button>
       </div>
-      <div class="cache-status" id="cache-status">Caché OSRM local: listo.</div>
+      <div class="cache-status" id="cache-status">Caché OSRM D1: listo.</div>
     </div>
 
   </div><!-- /ctrl -->
@@ -382,6 +382,8 @@ let gRoutes=[], gSchedules=[], gAllPts=null;
 let gRouteLayers=[], gPreviewMarkers=[];
 let baseMarker=null;
 let forceRecalculateOSRM=false;
+let currentBatchId=null;
+let currentCsvHash=null;
 
 // ══════════════════════════════════════════════════════════════
 //  MAP INIT
@@ -441,10 +443,15 @@ document.getElementById('calc-btn').addEventListener('click',()=>{forceRecalcula
 document.getElementById('recalc-btn').addEventListener('click',async()=>{
   if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
   forceRecalculateOSRM=true;
+  prepareServerBatch();
   await clearOSRMCache(false);
   calculateAll();
 });
-document.getElementById('clear-cache-btn').addEventListener('click',()=>clearOSRMCache(true));
+document.getElementById('clear-cache-btn').addEventListener('click',async()=>{
+  if(!GROUPS.length){toast('Cargá un CSV primero para identificar el lote.');return;}
+  prepareServerBatch();
+  await clearOSRMCache(true);
+});
 document.getElementById('export-btn').addEventListener('click',exportCSV);
 
 // Base apply
@@ -535,36 +542,15 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 // Keep calls controlled: timeout every fetch, retry failures, and avoid parallel walking requests.
 
 // ══════════════════════════════════════════════════════════════
-//  LOCAL OSRM CACHE — IndexedDB
-//  Guarda geometrías OSRM por transformador para poder reanudar.
+//  SERVER OSRM CACHE — Cloudflare Pages Functions + D1
+//  Guarda geometrías OSRM por transformador en D1 para poder reanudar.
 // ══════════════════════════════════════════════════════════════
-const OSRM_CACHE_DB='inspeccion_transformadores_osrm_cache_v1';
-const OSRM_CACHE_STORE='walking_routes';
-let osrmCacheDbPromise=null;
+const OSRM_CACHE_API_BASE = '/api/osrm';
+const OSRM_PARALLEL_GROUPS = 3;
 
 function setCacheStatus(msg){
   const el=document.getElementById('cache-status');
   if(el) el.textContent=msg;
-}
-
-function openOSRMCache(){
-  if(osrmCacheDbPromise) return osrmCacheDbPromise;
-  osrmCacheDbPromise=new Promise((resolve,reject)=>{
-    if(!('indexedDB' in window)){
-      reject(new Error('IndexedDB no está disponible en este navegador'));
-      return;
-    }
-    const req=indexedDB.open(OSRM_CACHE_DB,1);
-    req.onupgradeneeded=()=>{
-      const db=req.result;
-      if(!db.objectStoreNames.contains(OSRM_CACHE_STORE)){
-        db.createObjectStore(OSRM_CACHE_STORE,{keyPath:'key'});
-      }
-    };
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror=()=>reject(req.error || new Error('No se pudo abrir IndexedDB'));
-  });
-  return osrmCacheDbPromise;
 }
 
 function simpleHash(str){
@@ -576,49 +562,113 @@ function simpleHash(str){
   return (h>>>0).toString(36);
 }
 
-function buildWalkingCacheKey(grp){
-  const pts=[grp.trafo,...grp.apoyos].map(p=>({
-    id:p.idApoyo||p.idTrafo||'',
+function normalizePointForHash(p){
+  return {
+    id:String(p.idApoyo||p.idTrafo||''),
     lat:+Number(p.lat).toFixed(7),
     lon:+Number(p.lon).toFixed(7)
-  }));
-  return `walking:${grp.id}:${simpleHash(JSON.stringify(pts))}`;
+  };
 }
 
-async function getCachedWalkingRoute(key){
-  const db=await openOSRMCache();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(OSRM_CACHE_STORE,'readonly');
-    const req=tx.objectStore(OSRM_CACHE_STORE).get(key);
-    req.onsuccess=()=>resolve(req.result || null);
-    req.onerror=()=>reject(req.error || new Error('Error leyendo caché OSRM'));
+function buildCsvHash(){
+  const payload=GROUPS.map(g=>({
+    id:String(g.id),
+    trafo:normalizePointForHash(g.trafo),
+    apoyos:g.apoyos.map(normalizePointForHash),
+    clientes:g.totalClients
+  })).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+  return simpleHash(JSON.stringify(payload));
+}
+
+function prepareServerBatch(){
+  currentCsvHash=buildCsvHash();
+  currentBatchId=`csv_${currentCsvHash}`;
+  return {batch_id:currentBatchId,csv_hash:currentCsvHash};
+}
+
+function buildWalkingRequestHash(grp){
+  const pts=[grp.trafo,...grp.apoyos].map(normalizePointForHash);
+  return simpleHash(JSON.stringify(pts));
+}
+
+async function apiJson(url, options={}){
+  const res=await fetchWithTimeout(url,{
+    ...options,
+    headers:{
+      'Content-Type':'application/json',
+      ...(options.headers||{})
+    }
+  },20000);
+  let data=null;
+  try{ data=await res.json(); }catch(_){ data=null; }
+  if(!res.ok || !data || data.ok===false){
+    throw new Error((data && data.error) ? data.error : `API D1 HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function startServerBatch(){
+  const b=prepareServerBatch();
+  await apiJson(`${OSRM_CACHE_API_BASE}/batch/start`,{
+    method:'POST',
+    body:JSON.stringify({
+      batch_id:b.batch_id,
+      csv_hash:b.csv_hash,
+      total_groups:GROUPS.length
+    })
   });
+  setCacheStatus(`Caché OSRM D1: lote ${b.batch_id} registrado.`);
+  return b;
 }
 
-async function setCachedWalkingRoute(record){
-  const db=await openOSRMCache();
-  return new Promise((resolve,reject)=>{
-    const tx=db.transaction(OSRM_CACHE_STORE,'readwrite');
-    tx.objectStore(OSRM_CACHE_STORE).put(record);
-    tx.oncomplete=()=>resolve();
-    tx.onerror=()=>reject(tx.error || new Error('Error guardando caché OSRM'));
+async function getCachedWalkingRoute(grp){
+  if(!currentBatchId) prepareServerBatch();
+  const requestHash=buildWalkingRequestHash(grp);
+  const qs=new URLSearchParams({
+    batch_id:currentBatchId,
+    id_trafo:String(grp.id),
+    request_hash:requestHash
+  });
+  const data=await apiJson(`${OSRM_CACHE_API_BASE}/route/get?${qs.toString()}`,{method:'GET'});
+  if(!data.found) return null;
+  return {
+    walkTime:data.route.walk_time_min,
+    walkGeom:data.route.walk_geom,
+    walkOrder:data.route.walk_order,
+    requestHash
+  };
+}
+
+async function setCachedWalkingRoute(grp){
+  if(!currentBatchId) prepareServerBatch();
+  const requestHash=buildWalkingRequestHash(grp);
+  await apiJson(`${OSRM_CACHE_API_BASE}/route/save`,{
+    method:'POST',
+    body:JSON.stringify({
+      batch_id:currentBatchId,
+      id_trafo:String(grp.id),
+      request_hash:requestHash,
+      status:'done',
+      walk_geom:grp.walkGeom,
+      walk_time_min:grp.walkTime,
+      walk_order:grp.walkOrder,
+      error_message:null
+    })
   });
 }
 
 async function clearOSRMCache(showMsg=true){
   try{
-    const db=await openOSRMCache();
-    await new Promise((resolve,reject)=>{
-      const tx=db.transaction(OSRM_CACHE_STORE,'readwrite');
-      tx.objectStore(OSRM_CACHE_STORE).clear();
-      tx.oncomplete=()=>resolve();
-      tx.onerror=()=>reject(tx.error || new Error('No se pudo limpiar caché'));
+    if(!currentBatchId) prepareServerBatch();
+    await apiJson(`${OSRM_CACHE_API_BASE}/batch/clear`,{
+      method:'POST',
+      body:JSON.stringify({batch_id:currentBatchId})
     });
-    setCacheStatus('Caché OSRM local: limpio.');
-    if(showMsg) toast('Caché OSRM limpiado.');
+    setCacheStatus(`Caché OSRM D1: lote ${currentBatchId} limpiado.`);
+    if(showMsg) toast('Caché OSRM D1 limpiado para este CSV.');
   }catch(err){
     console.error(err);
-    if(showMsg) toast('No se pudo limpiar caché OSRM: '+err.message);
+    if(showMsg) toast('No se pudo limpiar caché D1: '+err.message);
   }
 }
 
@@ -732,18 +782,16 @@ async function computeGroupWalking(grp){
   }
 
   const label=`Trafo ${grp.id}`;
-  const cacheKey=buildWalkingCacheKey(grp);
-
   if(!forceRecalculateOSRM){
     try{
-      const cached=await getCachedWalkingRoute(cacheKey);
+      const cached=await getCachedWalkingRoute(grp);
       if(cached && cached.walkGeom && Array.isArray(cached.walkOrder)){
         applyCachedWalkingRoute(grp,cached);
         return;
       }
     }catch(cacheErr){
-      console.warn('No se pudo leer caché OSRM:', cacheErr);
-      setCacheStatus('Caché OSRM local: no disponible, calculando directo.');
+      console.warn('No se pudo leer caché OSRM D1:', cacheErr);
+      setCacheStatus('Caché OSRM D1: no disponible, calculando directo.');
     }
   }
 
@@ -788,31 +836,36 @@ async function computeGroupWalking(grp){
   grp.totalTime=grp.inspTime+grp.walkTime;
 
   try{
-    await setCachedWalkingRoute({
-      key:cacheKey,
-      idTrafo:grp.id,
-      walkTime:grp.walkTime,
-      walkGeom:grp.walkGeom,
-      walkOrder:grp.walkOrder,
-      createdAt:new Date().toISOString()
-    });
-    setCacheStatus(`Caché OSRM local: guardado Trafo ${grp.id}.`);
+    await setCachedWalkingRoute(grp);
+    setCacheStatus(`Caché OSRM D1: guardado Trafo ${grp.id}.`);
   }catch(cacheErr){
-    console.warn('No se pudo guardar caché OSRM:', cacheErr);
-    setCacheStatus('Caché OSRM local: no se pudo guardar, cálculo continúa.');
+    console.warn('No se pudo guardar caché OSRM D1:', cacheErr);
+    setCacheStatus('Caché OSRM D1: no se pudo guardar, cálculo continúa.');
   }
 }
 
 async function computeAllGroupWalking(groups, onProgress){
-  for(let i=0;i<groups.length;i++){
-    const grp=groups[i];
-    onProgress(i, groups.length, `Calculando OSRM para transformador ${grp.id}...`);
-    await computeGroupWalking(grp);
-    const src=grp.osrmCached ? 'caché local' : 'OSRM';
-    onProgress(i+1, groups.length, `Ruta ${src} completada para transformador ${grp.id}`);
-    if(!grp.osrmCached) await sleep(OSRM_REQUEST_GAP_MS);
+  const total=groups.length;
+  let done=0;
+  let fromCache=0;
+  let fromOSRM=0;
+
+  for(let i=0;i<groups.length;i+=OSRM_PARALLEL_GROUPS){
+    const batch=groups.slice(i,i+OSRM_PARALLEL_GROUPS);
+    onProgress(done,total,`Procesando lote OSRM ${Math.floor(i/OSRM_PARALLEL_GROUPS)+1} · ${done}/${total} completados...`);
+
+    await Promise.all(batch.map(async(grp)=>{
+      await computeGroupWalking(grp);
+      if(grp.osrmCached) fromCache++; else fromOSRM++;
+      done++;
+      onProgress(done,total,`Completado ${done}/${total} · D1: ${fromCache} · OSRM nuevos: ${fromOSRM}`);
+    }));
+
+    // Pequeña pausa entre lotes para no presionar el OSRM público.
+    if(i+OSRM_PARALLEL_GROUPS<groups.length) await sleep(OSRM_REQUEST_GAP_MS);
   }
 }
+
 
 // ── File upload ───────────────────────────────────────────────
 const csvInput=document.getElementById('csv-input');
@@ -1185,9 +1238,10 @@ async function calculateAll(){
     const allPts=[BASE_PT,...GROUPS.map(g=>({lat:g.trafo.lat,lon:g.trafo.lon}))];
     gAllPts=allPts;
 
-    setProgress(15,'Calculando rutas a pie entre apoyos (OSRM walking)...');
+    setProgress(15,'Consultando D1 y calculando rutas faltantes con OSRM walking...');
     computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
-    setCacheStatus(forceRecalculateOSRM ? 'Caché OSRM local: ignorado para recálculo.' : 'Caché OSRM local: consultando rutas guardadas...');
+    await startServerBatch();
+    setCacheStatus(forceRecalculateOSRM ? 'Caché OSRM D1: ignorado para recálculo.' : 'Caché OSRM D1: consultando rutas guardadas...');
     await computeAllGroupWalking(GROUPS,(done,total,msg)=>{
       const pct = total ? 15+Math.round((done/total)*20) : 15;
       setProgress(pct, msg || `Rutas a pie OSRM: ${done}/${total} transformadores...`);
@@ -1306,7 +1360,7 @@ async function calculateAll(){
 
     map.fitBounds([...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]],{padding:[30,30]});
     setProgress(100,'¡Listo!');
-    setCacheStatus('Caché OSRM local: cálculo finalizado.');
+    setCacheStatus('Caché OSRM D1: cálculo finalizado.');
     forceRecalculateOSRM=false;
     showLoading(false);
     document.getElementById('export-strip').style.display='block';
