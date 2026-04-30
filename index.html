@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspección Transformadores</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#0d0f14;--panel:#13161e;--border:#1e2330;
+  --accent:#f5a623;--blue:#3b82f6;--green:#22c55e;--red:#ef4444;--purple:#a855f7;
+  --text:#e2e8f0;--muted:#64748b;--card:#181c27;--walk:#94a3b8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'IBM Plex Sans',sans-serif;color:var(--text)}
+body{display:flex}
+
+/* ─── SIDEBAR ─── */
+#sidebar{width:375px;min-width:375px;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--border);overflow:hidden;z-index:900;height:100vh}
+
+/* ─── HEADER ─── */
+#hdr{padding:13px 18px 10px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.hdr-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
+#hdr h1{font-size:13px;font-weight:700;line-height:1.4}
+#hdr p{font-size:10px;color:var(--muted);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+
+/* ─── CONTROLS ─── */
+#ctrl{padding:11px 16px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;overflow-y:auto;max-height:55vh}
+#ctrl::-webkit-scrollbar{width:3px}
+#ctrl::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ctrl-section{margin-bottom:10px}
+.ctrl-section:last-child{margin-bottom:0}
+.ctrl-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:5px;display:block}
+
+/* CSV drop */
+#csv-drop{border:1.5px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+#csv-drop:hover,#csv-drop.drag{border-color:var(--accent);background:rgba(245,166,35,.04)}
+#csv-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.csv-icon{font-size:20px;margin-bottom:4px}
+.csv-prompt{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.csv-prompt b{color:var(--accent)}
+#csv-loaded{display:none;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px;padding:8px 12px;align-items:center;gap:8px}
+#csv-loaded.show{display:flex}
+.csv-fname{font-size:11px;font-weight:600;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.csv-fcount{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:1px}
+.csv-clear{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 7px;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0}
+.csv-clear:hover{border-color:var(--red);color:var(--red)}
+
+/* Grid inputs */
+.cfg-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.cfg-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px}
+.cfg-field{display:flex;flex-direction:column;gap:3px}
+.cfg-field label{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.8px}
+.cfg-input{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 7px;font-size:11px;font-family:'IBM Plex Mono',monospace;outline:none;transition:border-color .15s;width:100%}
+.cfg-input:focus{border-color:var(--accent)}
+.cfg-input[type=number]{-moz-appearance:textfield}
+.cfg-input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
+.toggle-lbl{font-size:11px;color:var(--text)}
+.toggle-sub{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.sw{position:relative;width:34px;height:19px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw-track{position:absolute;inset:0;background:var(--border);border-radius:10px;cursor:pointer;transition:background .2s}
+.sw input:checked+.sw-track{background:var(--accent)}
+.sw-thumb{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s;pointer-events:none}
+.sw input:checked~.sw-thumb{left:18px}
+
+/* Lunch fields */
+#lunch-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;overflow:hidden;transition:max-height .25s,opacity .25s;max-height:60px;opacity:1}
+#lunch-fields.hidden{max-height:0;opacity:0;pointer-events:none}
+
+/* N buttons */
+.n-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
+.n-btn{padding:6px 4px;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-size:11px;font-family:'IBM Plex Mono',monospace;transition:all .15s;text-align:center}
+.n-btn:hover{border-color:var(--accent);color:var(--accent)}
+.n-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+
+#calc-btn{width:100%;padding:10px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
+#calc-btn:hover{background:#e09515;transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,166,35,.3)}
+#calc-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ─── LOADING ─── */
+#loading{display:none;flex-direction:column;align-items:center;padding:12px 16px;gap:7px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+#loading.show{display:flex}
+.pbar-wrap{width:100%;background:var(--border);border-radius:4px;height:3px;overflow:hidden}
+.pbar{height:100%;background:var(--accent);border-radius:4px;transition:width .4s ease}
+#load-msg{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+
+/* ─── SUMMARY ─── */
+#summary{display:none;padding:7px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+#summary.show{display:flex}
+.sum-s{flex:1;text-align:center;padding:0 2px}
+.sum-s+.sum-s{border-left:1px solid var(--border)}
+.sum-v{font-size:14px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent)}
+.sum-l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:1px}
+
+/* ─── TABS ─── */
+#tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.tab-btn{flex:1;padding:8px;font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;background:none;border:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.5px}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ─── TAB BODY ─── */
+#tab-body{flex:1;overflow:hidden;position:relative;min-height:0}
+.tab-pane{position:absolute;inset:0;overflow-y:auto;display:none;flex-direction:column}
+.tab-pane.active{display:flex}
+.tab-pane::-webkit-scrollbar{width:4px}
+.tab-pane::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ─── RUTAS PANE ─── */
+#pane-rutas{padding:11px;gap:8px}
+.empty-state{padding:24px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+.vis-strip{display:flex;gap:5px;flex-wrap:wrap}
+.vis-btn{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;border:1.5px solid;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .18s;background:transparent}
+.vis-btn.hidden-route{opacity:.35;filter:grayscale(.7)}
+
+/* Day legend */
+.day-legend{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+.dl-title{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
+.dl-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
+
+/* Route cards */
+.route-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0}
+.rc-hdr{display:flex;align-items:center;padding:9px 12px;gap:8px;cursor:pointer;user-select:none}
+.rc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rc-title{font-size:12px;font-weight:700;flex:1}
+.rc-meta{text-align:right;font-family:'IBM Plex Mono',monospace}
+.rc-dist{font-size:11px;font-weight:600}
+.rc-time{font-size:9px;color:var(--muted)}
+.rc-arr{font-size:10px;color:var(--muted);margin-left:3px;transition:transform .2s}
+.rc-arr.open{transform:rotate(180deg)}
+.rc-body{display:none;padding:0 12px 9px}
+.rc-body.open{display:block}
+
+/* Group stop rows */
+.grp-row{padding:6px 0;border-top:1px solid var(--border)}
+.grp-row-hdr{display:flex;align-items:center;gap:7px}
+.grp-badge{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;font-family:'IBM Plex Mono',monospace;border:1.5px solid rgba(255,255,255,.2)}
+.grp-id{font-weight:700;font-size:11px;flex:1}
+.grp-meta{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.grp-day{font-size:8px;font-family:'IBM Plex Mono',monospace;padding:2px 5px;border-radius:3px;font-weight:700}
+.grp-detail{padding-left:31px;margin-top:3px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:4px}
+.grp-chip{background:var(--border);padding:1px 5px;border-radius:3px}
+
+/* ─── CRONOGRAMA PANE ─── */
+#pane-cron{padding:0;gap:0}
+.export-strip{padding:9px 13px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
+#export-btn{width:100%;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif}
+#export-btn:hover{background:#2563eb;transform:translateY(-1px)}
+#export-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none}
+#sched-inner{padding:9px;display:flex;flex-direction:column;gap:8px}
+
+.day-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0}
+.day-hdr{padding:7px 12px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.day-date-txt{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--accent)}
+.day-label-txt{font-size:10px;color:var(--muted)}
+.day-body{padding:3px 0}
+.sched-sup{padding:5px 12px 2px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-top:4px;display:flex;align-items:center;gap:5px}
+
+/* Schedule rows */
+.sched-travel{display:flex;align-items:center;gap:7px;padding:3px 12px;font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;border-top:1px solid var(--border);font-style:italic}
+.sched-grp{border-top:1px solid var(--border);padding:5px 12px}
+.sched-grp-hdr{display:flex;align-items:center;gap:7px}
+.sched-grp-time{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;min-width:38px;flex-shrink:0}
+.sched-grp-dash{font-size:9px;color:var(--muted);flex-shrink:0}
+.sched-grp-end{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);min-width:38px;flex-shrink:0}
+.sched-grp-id{font-weight:700;font-size:11px;flex:1}
+.sched-grp-kva{font-family:'IBM Plex Mono',monospace;font-size:9px;background:var(--border);padding:2px 5px;border-radius:4px;flex-shrink:0}
+.sched-grp-detail{padding-left:92px;margin-top:2px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:3px}
+.sched-chip{background:var(--border);padding:1px 5px;border-radius:3px}
+.sched-chip.walk{background:rgba(148,163,184,.12);color:var(--walk)}
+
+.sched-lunch{display:flex;align-items:center;gap:7px;padding:4px 12px;border-top:1px solid var(--border);font-size:10px;font-family:'IBM Plex Mono',monospace;color:#a16207;background:rgba(161,98,7,.07)}
+.sched-return{display:flex;align-items:center;gap:5px;padding:4px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-style:italic}
+.overflow-row{display:flex;align-items:center;gap:5px;padding:4px 12px;font-size:10px;color:var(--red);border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace}
+
+/* ─── FOOTER ─── */
+#footer{padding:6px 14px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);display:flex;align-items:center;gap:5px;background:var(--bg);flex-shrink:0}
+.fdot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─── MAP ─── */
+#map{flex:1;background:#1a1f2e}
+.leaflet-tile{filter:brightness(.82) saturate(.65)}
+.leaflet-popup-content-wrapper{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.leaflet-popup-tip{background:var(--card)}
+.leaflet-popup-close-button{color:var(--muted)!important}
+
+/* ─── TOAST ─── */
+#toast{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;padding:9px 18px;border-radius:8px;font-size:11px;z-index:9999;font-family:'IBM Plex Mono',monospace;max-width:340px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="hdr">
+    <div class="hdr-tag">⚡ Inspección Redes Eléctricas</div>
+    <h1>Ruteo de Transformadores<br>y Clientes Asociados</h1>
+    <p id="hdr-sub">Cargá un CSV para comenzar · OSRM + OpenStreetMap</p>
+  </div>
+
+  <div id="ctrl">
+
+    <!-- CSV -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Archivo de datos</span>
+      <div id="csv-drop">
+        <input type="file" id="csv-input" accept=".csv,.txt">
+        <div class="csv-icon">📂</div>
+        <div class="csv-prompt">Arrastrá o hacé click · <b>CSV</b><br>
+          <span style="font-size:9px;opacity:.7">Tipo · ID_APOYO · ID_Transformador · CantidadClientes · Latitud · Longitud</span>
+        </div>
+      </div>
+      <div id="csv-loaded">
+        <div style="flex:1;min-width:0">
+          <div class="csv-fname" id="csv-fname">—</div>
+          <div class="csv-fcount" id="csv-fcount">—</div>
+        </div>
+        <button class="csv-clear" id="csv-clear">✕ Cambiar</button>
+      </div>
+    </div>
+
+    <!-- Base point -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Punto de partida / Base</span>
+      <div class="cfg-row">
+        <div class="cfg-field"><label>LATITUD</label><input class="cfg-input" type="number" id="cfg-blat" value="15.488029" step="0.000001"></div>
+        <div class="cfg-field"><label>LONGITUD</label><input class="cfg-input" type="number" id="cfg-blon" value="-87.979872" step="0.000001"></div>
+      </div>
+      <button id="base-apply-btn" style="width:100%;padding:5px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s">
+        📍 Actualizar base en el mapa
+      </button>
+    </div>
+
+    <!-- Work hours -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Jornada laboral</span>
+      <div class="cfg-row">
+        <div class="cfg-field"><label>INICIO</label><input class="cfg-input" type="time" id="cfg-wstart" value="07:00" step="60"></div>
+        <div class="cfg-field"><label>FIN</label><input class="cfg-input" type="time" id="cfg-wend" value="16:00" step="60"></div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:-3px;margin-bottom:4px">Hacé click en las horas/minutos y usá las flechas ↑↓ para cambiar</div>
+    </div>
+
+    <!-- Inspection times -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Tiempos de inspección</span>
+      <div class="cfg-row">
+        <div class="cfg-field">
+          <label>TRAFO (MIN)</label>
+          <input class="cfg-input" type="number" id="cfg-trafo-min" value="2" min="1" max="60" step="0.5">
+        </div>
+        <div class="cfg-field">
+          <label>POR CLIENTE (MIN)</label>
+          <input class="cfg-input" type="number" id="cfg-client-min" value="2.5" min="0.5" max="30" step="0.5">
+        </div>
+      </div>
+    </div>
+
+    <!-- Traffic factor -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Factor de tráfico vehicular</span>
+      <div class="cfg-field">
+        <label>FACTOR <span style="color:var(--accent);font-size:8px">· 1.0 = ideal · 1.8 = urbano SPS</span></label>
+        <input class="cfg-input" type="number" id="cfg-traffic" value="1.8" min="1.0" max="3.0" step="0.1">
+      </div>
+    </div>
+
+    <!-- Lunch -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Almuerzo</span>
+      <div class="toggle-row">
+        <div><div class="toggle-lbl">Incluir hora de almuerzo</div><div class="toggle-sub">Bloque fijo sin inspecciones</div></div>
+        <label class="sw"><input type="checkbox" id="cfg-lunch" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      </div>
+      <div id="lunch-fields">
+        <div class="cfg-field"><label>INICIO ALMUERZO</label><input class="cfg-input" type="time" id="cfg-lstart" value="12:00"></div>
+        <div class="cfg-field"><label>DURACIÓN (MIN)</label><input class="cfg-input" type="number" id="cfg-ldur" value="60" min="15" max="120" step="15"></div>
+      </div>
+    </div>
+
+    <!-- Weekends -->
+    <div class="ctrl-section">
+      <div class="toggle-row" style="margin-bottom:0">
+        <div><div class="toggle-lbl">Excluir fines de semana</div><div class="toggle-sub">Sábado y Domingo no laborables</div></div>
+        <label class="sw"><input type="checkbox" id="cfg-noweekend" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
+      </div>
+    </div>
+
+    <!-- Cuadrillas -->
+    <div class="ctrl-section">
+      <span class="ctrl-label">Número de cuadrillas</span>
+      <div class="n-btns">
+        <button class="n-btn" data-n="1">1</button>
+        <button class="n-btn active" data-n="2">2</button>
+        <button class="n-btn" data-n="3">3</button>
+        <button class="n-btn" data-n="4">4</button>
+      </div>
+      <button id="calc-btn" disabled>📂 Cargá un CSV para calcular</button>
+    </div>
+
+  </div><!-- /ctrl -->
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div style="width:100%"><div class="pbar-wrap"><div class="pbar" id="pbar" style="width:4%"></div></div></div>
+    <div id="load-msg">Iniciando...</div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div id="summary">
+    <div class="sum-s"><div class="sum-v" id="s-trafos">—</div><div class="sum-l">Transformadores</div></div>
+    <div class="sum-s"><div class="sum-v" id="s-clients">—</div><div class="sum-l">Clientes</div></div>
+    <div class="sum-s"><div class="sum-v" id="s-days">—</div><div class="sum-l">Días estimados</div></div>
+    <div class="sum-s"><div class="sum-v" id="s-dist">—</div><div class="sum-l">Distancia</div></div>
+  </div>
+
+  <!-- TABS -->
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="rutas">🗺 Rutas</button>
+    <button class="tab-btn" data-tab="cron">📅 Cronograma</button>
+  </div>
+
+  <!-- TAB BODY -->
+  <div id="tab-body">
+    <div id="pane-rutas" class="tab-pane active">
+      <div class="empty-state">Cargá un CSV y presioná <b>Calcular</b> para trazar las rutas.</div>
+    </div>
+    <div id="pane-cron" class="tab-pane">
+      <div class="export-strip" id="export-strip" style="display:none">
+        <button id="export-btn" disabled>⬇ Descargar Cronograma CSV</button>
+      </div>
+      <div id="sched-inner">
+        <div class="empty-state">El cronograma aparecerá aquí después de calcular.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <div class="fdot"></div>
+    OSRM geometría vial · Haversine × factor tráfico para matriz · Walking haversine entre apoyos
+  </div>
+</div>
+
+<div id="map"></div>
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════════════
+const ROUTE_COLORS = ['#ef4444','#3b82f6','#22c55e','#a855f7'];
+const ROUTE_NAMES  = ['Ruta A','Ruta B','Ruta C','Ruta D'];
+const SUP_LABELS   = ['Supervisor 1','Supervisor 2','Supervisor 3','Supervisor 4'];
+
+// Distinct colors per day (shared across routes)
+const DAY_COLORS = ['#f59e0b','#06b6d4','#84cc16','#ec4899','#8b5cf6','#14b8a6','#f97316','#6366f1','#10b981','#e11d48'];
+
+// Walking speed: 4 km/h = 1 km per 15 min
+const WALK_SPEED_MIN_PER_KM = 15;
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let BASE_PT = {lat:15.488029, lon:-87.979872};
+let RAW_ROWS = [];       // parsed CSV rows
+let GROUPS = [];         // [{id, trafo, apoyos, totalClients, inspTime}]
+let numRoutes = 2;
+let gRoutes=[], gSchedules=[], gAllPts=null;
+let gRouteLayers=[], gPreviewMarkers=[];
+let baseMarker=null;
+
+// ══════════════════════════════════════════════════════════════
+//  MAP INIT
+// ══════════════════════════════════════════════════════════════
+const map = L.map('map',{zoomControl:false,preferCanvas:true}).setView([15.60,-87.96],11);
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap',
+  maxZoom:19
+}).addTo(map);
+
+baseMarker = L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:2000})
+  .bindPopup('<b>BASE / Depósito</b>').addTo(map);
+
+function mkBaseIcon(){
+  return L.divIcon({html:`<div style="width:32px;height:32px;border-radius:50%;background:#f5a623;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid rgba(255,255,255,.9);box-shadow:0 3px 12px rgba(245,166,35,.5)">▶</div>`,iconSize:[32,32],iconAnchor:[16,16],className:''});
+}
+function mkTrafoIcon(label, color){
+  const light = needsLightText(color);
+  return L.divIcon({
+    html:`<div style="width:28px;height:28px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;color:${light?'#fff':'#111'};font-size:8px;font-weight:800;border:2.5px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.55);font-family:'IBM Plex Mono',monospace">T${label}</div>`,
+    iconSize:[28,28],iconAnchor:[14,14],className:''
+  });
+}
+function mkApoyoIcon(color){
+  return L.divIcon({
+    html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.7);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    iconSize:[10,10],iconAnchor:[5,5],className:''
+  });
+}
+function mkPreviewTrafoIcon(){
+  return L.divIcon({html:`<div style="width:10px;height:10px;border-radius:3px;background:#475569;border:1.5px solid #64748b"></div>`,iconSize:[10,10],iconAnchor:[5,5],className:''});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TABS & N-BUTTONS
+// ══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-'+btn.dataset.tab).classList.add('active');
+  });
+});
+document.querySelectorAll('.n-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.n-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    numRoutes=+btn.dataset.n;
+  });
+});
+document.getElementById('cfg-lunch').addEventListener('change',e=>{
+  document.getElementById('lunch-fields').classList.toggle('hidden',!e.target.checked);
+});
+document.getElementById('calc-btn').addEventListener('click',calculateAll);
+document.getElementById('export-btn').addEventListener('click',exportCSV);
+
+// Base apply
+document.getElementById('base-apply-btn').addEventListener('click',()=>{
+  const lat=parseFloat(document.getElementById('cfg-blat').value);
+  const lon=parseFloat(document.getElementById('cfg-blon').value);
+  if(isNaN(lat)||isNaN(lon)){toast('Coordenadas inválidas.');return;}
+  BASE_PT={lat,lon};
+  baseMarker.setLatLng([lat,lon]);
+  map.setView([lat,lon],13);
+});
+
+// ══════════════════════════════════════════════════════════════
+//  CSV PARSING — fixed 6-column format
+//  Tipo | ID_APOYO | ID_Transformador | CantidadClientes | Latitud | Longitud
+// ══════════════════════════════════════════════════════════════
+function parseCSV(text){
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) throw new Error('Archivo vacío o sin datos');
+  const sep=lines[0].includes(';')?';':',';
+  const rows=[];
+  // Skip header row (line 0)
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(sep).map(c=>c.trim().replace(/^"|"$/g,''));
+    if(cols.length<6||cols.every(c=>!c)) continue;
+    const lat=parseFloat(cols[4].replace(',','.'));
+    const lon=parseFloat(cols[5].replace(',','.'));
+    if(isNaN(lat)||isNaN(lon)) continue;
+    rows.push({
+      tipo: cols[0].trim().toLowerCase(),        // 'transformador' or 'apoyo'
+      idApoyo: cols[1].trim(),
+      idTrafo: cols[2].trim(),
+      clientes: parseInt(cols[3])||0,
+      lat, lon
+    });
+  }
+  return rows;
+}
+
+function buildGroups(rows){
+  // Group rows by ID_Transformador
+  const map2={};
+  rows.forEach(r=>{
+    if(!map2[r.idTrafo]) map2[r.idTrafo]={trafo:null,apoyos:[]};
+    if(r.tipo==='transformador'){
+      map2[r.idTrafo].trafo=r;
+    } else {
+      map2[r.idTrafo].apoyos.push(r);
+    }
+  });
+
+  const groups=[];
+  Object.keys(map2).forEach(id=>{
+    const g=map2[id];
+    if(!g.trafo){
+      // No transformer row found — skip or use first apoyo as anchor
+      return;
+    }
+    const totalClients=g.trafo.clientes+g.apoyos.reduce((s,a)=>s+a.clientes,0);
+    groups.push({
+      id,
+      trafo: g.trafo,
+      apoyos: g.apoyos,       // additional apoyos (not the trafo apoyo)
+      totalClients,
+      inspTime: 0,             // filled in after config is read
+      walkTime: 0              // walking between apoyos (haversine)
+    });
+  });
+  return groups;
+}
+
+function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
+  groups.forEach(g=>{
+    // Inspection time
+    g.inspTime = inspTrafoMin                         // transformer levantamiento
+      + g.trafo.clientes * inspClientMin              // clients at trafo apoyo
+      + g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0); // clients at each apoyo
+
+    // Walking time between apoyos using haversine (trafo → apoyo1 → apoyo2 → ...)
+    g.walkTime = 0;
+    if(g.apoyos.length > 0){
+      // Nearest-neighbor walk order starting from trafo
+      const pts=[g.trafo,...g.apoyos];
+      const visited=new Set([0]);
+      let cur=0;
+      while(visited.size<pts.length){
+        let best=-1,bd=Infinity;
+        for(let j=0;j<pts.length;j++){
+          if(visited.has(j)) continue;
+          const d=haversineKm(pts[cur].lat,pts[cur].lon,pts[j].lat,pts[j].lon);
+          if(d<bd){bd=d;best=j;}
+        }
+        g.walkTime+=bd*WALK_SPEED_MIN_PER_KM;
+        visited.add(best);
+        cur=best;
+      }
+    }
+
+    // Total time at this stop
+    g.totalTime = g.inspTime + g.walkTime;
+  });
+}
+
+// ── File upload ───────────────────────────────────────────────
+const csvInput=document.getElementById('csv-input');
+const csvDrop=document.getElementById('csv-drop');
+csvInput.addEventListener('change',e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
+csvDrop.addEventListener('dragover',e=>{e.preventDefault();csvDrop.classList.add('drag');});
+csvDrop.addEventListener('dragleave',()=>csvDrop.classList.remove('drag'));
+csvDrop.addEventListener('drop',e=>{e.preventDefault();csvDrop.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+document.getElementById('csv-clear').addEventListener('click',clearCSV);
+
+function handleFile(file){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      RAW_ROWS=parseCSV(ev.target.result);
+      GROUPS=buildGroups(RAW_ROWS);
+      if(!GROUPS.length){toast('No se encontraron grupos válidos.\nVerificá que el CSV tenga filas con Tipo=Transformador.');return;}
+      showLoadedState(file.name);
+      previewGroups();
+    }catch(err){toast('Error leyendo archivo: '+err.message);}
+  };
+  reader.onerror=()=>{
+    const r2=new FileReader();
+    r2.onload=ev=>{
+      try{
+        RAW_ROWS=parseCSV(ev.target.result);
+        GROUPS=buildGroups(RAW_ROWS);
+        if(!GROUPS.length){toast('No se encontraron grupos válidos.');return;}
+        showLoadedState(file.name);
+        previewGroups();
+      }catch(err){toast('Error: '+err.message);}
+    };
+    r2.readAsText(file,'ISO-8859-1');
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+function showLoadedState(fname){
+  const totalClients=GROUPS.reduce((s,g)=>s+g.totalClients,0);
+  csvDrop.style.display='none';
+  document.getElementById('csv-loaded').classList.add('show');
+  document.getElementById('csv-fname').textContent=fname;
+  document.getElementById('csv-fcount').textContent=`${GROUPS.length} transformadores · ${RAW_ROWS.length} registros · ${totalClients} clientes`;
+  document.getElementById('hdr-sub').textContent=`${GROUPS.length} transformadores · ${totalClients} clientes totales`;
+  const btn=document.getElementById('calc-btn');
+  btn.disabled=false;
+  btn.innerHTML='⚡ Calcular Rutas y Cronograma';
+}
+
+function clearCSV(){
+  RAW_ROWS=[]; GROUPS=[];
+  csvDrop.style.display='block';
+  document.getElementById('csv-loaded').classList.remove('show');
+  csvInput.value='';
+  document.getElementById('hdr-sub').textContent='Cargá un CSV para comenzar · OSRM + OpenStreetMap';
+  const btn=document.getElementById('calc-btn');
+  btn.disabled=true;
+  btn.innerHTML='📂 Cargá un CSV para calcular';
+  gPreviewMarkers.forEach(m=>map.removeLayer(m));
+  gPreviewMarkers=[];
+}
+
+function previewGroups(){
+  gPreviewMarkers.forEach(m=>map.removeLayer(m));
+  gPreviewMarkers=[];
+  GROUPS.forEach(g=>{
+    const m=L.marker([g.trafo.lat,g.trafo.lon],{icon:mkPreviewTrafoIcon()})
+      .bindPopup(`<b>Trafo ${g.id}</b><br><span style="color:#94a3b8">${g.apoyos.length+1} apoyos · ${g.totalClients} clientes</span>`)
+      .addTo(map);
+    gPreviewMarkers.push(m);
+  });
+  if(GROUPS.length){
+    const bounds=[...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]];
+    map.fitBounds(bounds,{padding:[40,40]});
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════
+const fmtKm  = m=>(m/1000).toFixed(1)+' km';
+const fmtT   = s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}h ${m}m`:`${m}m`;};
+const fmtTMin= m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return h>0?`${h}h ${mn}m`:`${mn}m`;};
+const minToT = m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;};
+
+function needsLightText(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return(r*299+g*587+b*114)/1000<128;
+}
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function setProgress(pct,msg){document.getElementById('pbar').style.width=pct+'%';document.getElementById('load-msg').textContent=msg;}
+function showLoading(on){document.getElementById('loading').classList[on?'add':'remove']('show');document.getElementById('calc-btn').disabled=on;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',5000);}
+
+// ══════════════════════════════════════════════════════════════
+//  CONFIG BUILDER
+// ══════════════════════════════════════════════════════════════
+function getConfig(){
+  const [wsh,wsm]=document.getElementById('cfg-wstart').value.split(':').map(Number);
+  const [weh,wem]=document.getElementById('cfg-wend').value.split(':').map(Number);
+  const workStart=wsh*60+wsm, workEnd=weh*60+wem;
+  const inspTrafoMin=parseFloat(document.getElementById('cfg-trafo-min').value)||2;
+  const inspClientMin=parseFloat(document.getElementById('cfg-client-min').value)||2.5;
+  const trafficFactor=parseFloat(document.getElementById('cfg-traffic').value)||1.8;
+  const lunchEnabled=document.getElementById('cfg-lunch').checked;
+  const [lsh,lsm]=document.getElementById('cfg-lstart').value.split(':').map(Number);
+  const lunchStart=lsh*60+lsm;
+  const lunchDur=parseInt(document.getElementById('cfg-ldur').value)||60;
+  const noWeekend=document.getElementById('cfg-noweekend').checked;
+  return{workStart,workEnd,inspTrafoMin,inspClientMin,trafficFactor,lunchEnabled,lunchStart,lunchDur,noWeekend};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  WORKING DAYS GENERATOR — starts today, generates forward
+// ══════════════════════════════════════════════════════════════
+function getWorkingDay(dayOffset, noWeekend){
+  const DAY_NAMES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MONTH_NAMES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const today=new Date();
+  today.setHours(12,0,0,0);
+  let count=0, cur=new Date(today);
+  while(true){
+    const dow=cur.getDay();
+    const skip=noWeekend&&(dow===0||dow===6);
+    if(!skip){
+      if(count===dayOffset){
+        const y=cur.getFullYear(),mo=cur.getMonth(),d=cur.getDate();
+        return{
+          date:`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,
+          label:`${DAY_NAMES[dow]}, ${d} de ${MONTH_NAMES[mo]} ${y}`
+        };
+      }
+      count++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  K-MEANS (k-means++)
+// ══════════════════════════════════════════════════════════════
+function kMeans(pts,k,runs=30){
+  if(k>=pts.length) return pts.map((_,i)=>i%k);
+  let best=null,bestScore=Infinity;
+  for(let r=0;r<runs;r++){
+    const ci=[Math.floor(Math.random()*pts.length)];
+    while(ci.length<k){
+      const ds=pts.map(p=>Math.min(...ci.map(c=>(p.lat-pts[c].lat)**2+(p.lon-pts[c].lon)**2)));
+      const sum=ds.reduce((a,b)=>a+b,0);
+      let rnd=Math.random()*sum,pi=0;
+      for(;pi<ds.length-1;pi++){rnd-=ds[pi];if(rnd<=0)break;}
+      ci.push(pi);
+    }
+    let cents=ci.map(i=>({lat:pts[i].lat,lon:pts[i].lon}));
+    let asgn=new Array(pts.length).fill(0);
+    for(let iter=0;iter<100;iter++){
+      const na=pts.map(p=>{let b=0,bd=Infinity;cents.forEach((c,i)=>{const d=(p.lat-c.lat)**2+(p.lon-c.lon)**2;if(d<bd){bd=d;b=i;}});return b;});
+      if(!na.some((a,i)=>a!==asgn[i])) break;
+      asgn=na;
+      for(let i=0;i<k;i++){
+        const cl=pts.filter((_,j)=>asgn[j]===i);
+        if(cl.length)cents[i]={lat:cl.reduce((s,p)=>s+p.lat,0)/cl.length,lon:cl.reduce((s,p)=>s+p.lon,0)/cl.length};
+      }
+    }
+    const szs=Array.from({length:k},(_,i)=>asgn.filter(a=>a===i).length);
+    const sc=Math.max(...szs)-Math.min(...szs);
+    if(sc<bestScore){bestScore=sc;best=asgn;}
+  }
+  return best;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  NEAREST NEIGHBOR + 2-OPT (on group indices)
+// ══════════════════════════════════════════════════════════════
+function nnTSP(mat,clIdx){
+  const route=[0],rem=new Set(clIdx);
+  while(rem.size>0){
+    const last=route[route.length-1];
+    let best=-1,bd=Infinity;
+    rem.forEach(i=>{const d=mat[last][i];if(d<bd){bd=d;best=i;}});
+    route.push(best);rem.delete(best);
+  }
+  route.push(0);return route;
+}
+function twoOpt(mat,route){
+  let r=[...route],imp=true;
+  while(imp){
+    imp=false;
+    for(let i=1;i<r.length-2;i++){
+      for(let j=i+1;j<r.length-1;j++){
+        if(mat[r[i-1]][r[j]]+mat[r[i]][r[j+1]]<mat[r[i-1]][r[i]]+mat[r[j]][r[j+1]]-0.01){
+          r=[...r.slice(0,i),...r.slice(i,j+1).reverse(),...r.slice(j+1)];imp=true;
+        }
+      }
+    }
+  }
+  return r;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SCHEDULER — group-level stops
+// ══════════════════════════════════════════════════════════════
+function buildSchedule(groupIndices, scaledDur, cfg){
+  // groupIndices: indices into allPts (0=BASE, 1..n=groups)
+  const {workStart,workEnd,lunchEnabled,lunchStart,lunchDur,noWeekend}=cfg;
+  const entries=[];
+  let dayIdx=0, curTime=workStart, prevIdx=0, lunchUsedToday=false;
+
+  const checkLunch=(arrMin)=>{
+    if(!lunchEnabled||lunchUsedToday) return {arrMin,lunchApplied:false};
+    // Arrive during lunch
+    if(arrMin>=lunchStart && arrMin<lunchStart+lunchDur){
+      lunchUsedToday=true;
+      return{arrMin:arrMin+lunchDur,lunchApplied:true,lunchBefore:true,lunchBreakStart:arrMin,lunchBreakEnd:arrMin+lunchDur};
+    }
+    return{arrMin,lunchApplied:false};
+  };
+
+  for(let si=0;si<groupIndices.length;si++){
+    const grpPtIdx=groupIndices[si]; // index in allPts
+    const grpIdx=grpPtIdx-1;         // index in GROUPS array
+    const grp=GROUPS[grpIdx];
+    const travelMin=(scaledDur[prevIdx][grpPtIdx]||0)/60;
+
+    let arrMin=curTime+travelMin;
+    let lunchApplied=false,lunchBefore=false,lunchBreakStart=null,lunchBreakEnd=null;
+    let effectiveDep;
+
+    // Lunch before inspection
+    const lc=checkLunch(arrMin);
+    arrMin=lc.arrMin;
+    if(lc.lunchApplied){lunchApplied=true;lunchBefore=true;lunchBreakStart=lc.lunchBreakStart;lunchBreakEnd=lc.lunchBreakEnd;}
+
+    const retMin=(scaledDur[grpPtIdx][0]||0)/60;
+
+    // Day overflow — solo verifica que la inspección quepa, el regreso puede pasarse
+    if(arrMin+grp.totalTime>workEnd||arrMin>=workEnd){
+      dayIdx++;
+      lunchUsedToday=false;
+      curTime=workStart; prevIdx=0;
+      arrMin=curTime+(scaledDur[0][grpPtIdx]||0)/60;
+      lunchApplied=false;lunchBefore=false;lunchBreakStart=null;lunchBreakEnd=null;
+      const lc2=checkLunch(arrMin);
+      arrMin=lc2.arrMin;
+      if(lc2.lunchApplied){lunchApplied=true;lunchBefore=true;lunchBreakStart=lc2.lunchBreakStart;lunchBreakEnd=lc2.lunchBreakEnd;}
+    }
+
+    const depMin=arrMin+grp.totalTime;
+
+    // Lunch after inspection
+    if(lunchEnabled&&!lunchUsedToday&&depMin>lunchStart){
+      lunchApplied=true;lunchBefore=false;
+      lunchBreakStart=depMin;lunchBreakEnd=depMin+lunchDur;
+      lunchUsedToday=true;
+      effectiveDep=depMin+lunchDur;
+      curTime=effectiveDep;
+    } else {
+      effectiveDep=depMin;
+      curTime=depMin;
+    }
+
+    const wd=getWorkingDay(dayIdx,noWeekend);
+    entries.push({
+      dayIdx, date:wd.date, dateLabel:wd.label,
+      grpPtIdx, grpIdx, arrMin, depMin, effectiveDep, retMin,
+      travelMin, overflow:false,
+      lunchApplied,lunchBefore,lunchBreakStart,lunchBreakEnd
+    });
+    prevIdx=grpPtIdx;
+  }
+  return entries;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  OSRM — route geometry only
+async function osrmRoute(pts){
+  // Split into chunks of max 25 waypoints to avoid URL limits
+  // For long routes, chain the chunks
+  if(pts.length<=25){
+    const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
+    const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    if(!res.ok) return null;
+    const d=await res.json();
+    if(d.code!=='Ok') return null;
+    return{geom:d.routes[0].geometry,distance:d.routes[0].distance,duration:d.routes[0].duration};
+  }
+  // For longer routes, chunk and merge geometries
+  const CHUNK=24;
+  let totalDist=0,totalDur=0;
+  const allCoords=[];
+  for(let i=0;i<pts.length-1;i+=CHUNK){
+    const chunk=pts.slice(i,Math.min(i+CHUNK+1,pts.length));
+    const coords=chunk.map(p=>`${p.lon},${p.lat}`).join(';');
+    const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    if(!res.ok) continue;
+    const d=await res.json();
+    if(d.code!=='Ok') continue;
+    totalDist+=d.routes[0].distance;
+    totalDur+=d.routes[0].duration;
+    const coords2=d.routes[0].geometry.coordinates;
+    coords2.forEach(c=>{if(!allCoords.length||JSON.stringify(allCoords[allCoords.length-1])!==JSON.stringify(c))allCoords.push(c);});
+  }
+  if(!allCoords.length) return null;
+  return{geom:{type:'LineString',coordinates:allCoords},distance:totalDist,duration:totalDur};
+}
+
+// ── Haversine-based driving matrix (no API limit) ─────────────
+// Uses straight-line distance × road factor (1.35) × traffic factor
+// Good enough for TSP ordering; OSRM used only for geometry display
+function buildHaversineMatrix(pts, trafficFactor){
+  const ROAD_FACTOR=1.35; // road distance ≈ 1.35× straight line
+  const AVG_SPEED_KMH=40; // average urban driving speed (km/h)
+  const n=pts.length;
+  // Returns durations in seconds (to match OSRM table format)
+  const mat=Array.from({length:n},(_,i)=>
+    Array.from({length:n},(_,j)=>{
+      if(i===j) return 0;
+      const km=haversineKm(pts[i].lat,pts[i].lon,pts[j].lat,pts[j].lon);
+      const roadKm=km*ROAD_FACTOR;
+      const hours=roadKm/AVG_SPEED_KMH;
+      return hours*3600*trafficFactor; // seconds, traffic already applied
+    })
+  );
+  return mat;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN CALCULATE
+// ══════════════════════════════════════════════════════════════
+async function calculateAll(){
+  if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
+  const cfg=getConfig();
+
+  // Read & apply base from UI
+  const baseLat=parseFloat(document.getElementById('cfg-blat').value);
+  const baseLon=parseFloat(document.getElementById('cfg-blon').value);
+  if(isNaN(baseLat)||isNaN(baseLon)){toast('Coordenadas de base inválidas.');return;}
+  BASE_PT={lat:baseLat,lon:baseLon};
+  baseMarker.setLatLng([baseLat,baseLon]);
+
+  // Compute inspection + walking times
+  computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
+
+  // Clear map
+  gRouteLayers.forEach(rl=>{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>map.removeLayer(m));});
+  gRouteLayers=[];
+  gPreviewMarkers.forEach(m=>map.removeLayer(m)); gPreviewMarkers=[];
+  document.getElementById('pane-rutas').innerHTML='';
+  document.getElementById('sched-inner').innerHTML='<div class="empty-state">Calculando...</div>';
+  document.getElementById('summary').classList.remove('show');
+  document.getElementById('export-strip').style.display='none';
+  document.getElementById('export-btn').disabled=true;
+  gRoutes=[]; gSchedules=[];
+
+  showLoading(true);
+  setProgress(5,'Conectando con servidor de ruteo...');
+
+  try{
+    // allPts: BASE + one point per transformer group
+    const allPts=[BASE_PT,...GROUPS.map(g=>({lat:g.trafo.lat,lon:g.trafo.lon}))];
+    gAllPts=allPts;
+
+    setProgress(15,'Calculando matriz de distancias...');
+    // Use haversine matrix — no API limit, works for any number of points
+    // Traffic factor already embedded in the matrix (seconds)
+    const scaledDur=buildHaversineMatrix(allPts,cfg.trafficFactor);
+    // Approximate distances for summary (km)
+    const distMatrix=allPts.map((p,i)=>allPts.map((q,j)=>i===j?0:haversineKm(p.lat,p.lon,q.lat,q.lon)*1.35*1000));
+
+    setProgress(35,'Agrupando en cuadrillas...');
+    const k=Math.min(numRoutes,GROUPS.length);
+    const asgn=k===1?new Array(GROUPS.length).fill(0):kMeans(GROUPS.map(g=>g.trafo),k);
+
+    setProgress(50,'Optimizando recorrido...');
+    const routes=[];
+    for(let ki=0;ki<k;ki++){
+      // Indices into allPts (offset by 1 since BASE=0)
+      const clIdx=GROUPS.map((_,i)=>i+1).filter((_,i)=>asgn[i]===ki);
+      if(!clIdx.length) continue;
+      let idx=nnTSP(scaledDur,clIdx);
+      idx=twoOpt(scaledDur,idx);
+      // groupIndices = middle elements (exclude BASE bookends)
+      const groupIndices=idx.slice(1,-1);
+      routes.push({color:ROUTE_COLORS[ki],name:ROUTE_NAMES[ki],sup:SUP_LABELS[ki],ri:ki,
+        indices:idx, groupIndices,
+        points:idx.map(i=>allPts[i])});
+    }
+    gRoutes=routes;
+
+    let totalDist=0,totalDur=0;
+
+    for(let ri=0;ri<routes.length;ri++){
+      const route=routes[ri];
+      setProgress(55+ri*(35/routes.length),`Trazando ${route.name} en red vial...`);
+
+      // Schedule
+      const sched=buildSchedule(route.groupIndices,scaledDur,cfg);
+      gSchedules.push(sched);
+
+      // Day map for marker coloring
+      const ptDayMap={};
+      sched.forEach(e=>{if(!e.overflow)ptDayMap[e.grpPtIdx]=e.dayIdx;});
+
+      // Road geometry (driving between transformers)
+      const rd=await osrmRoute(route.points);
+      let lineLayer=null;
+      if(rd){
+        route.distance=rd.distance; route.duration=rd.duration*cfg.trafficFactor;
+        totalDist+=rd.distance; totalDur+=route.duration;
+        lineLayer=L.geoJSON(rd.geom,{style:{color:route.color,weight:4,opacity:.85,lineCap:'round',lineJoin:'round'}}).addTo(map);
+      } else {
+        // Fallback: straight lines + haversine distance
+        let d=0;
+        for(let i=0;i<route.points.length-1;i++) d+=haversineKm(route.points[i].lat,route.points[i].lon,route.points[i+1].lat,route.points[i+1].lon)*1350;
+        route.distance=d; totalDist+=d;
+        lineLayer=L.polyline(route.points.map(p=>[p.lat,p.lon]),{color:route.color,weight:4,opacity:.85}).addTo(map);
+      }
+
+      // Markers
+      const markerLayers=[];
+
+      // Base
+      const bm=L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:1000}).bindPopup('<b>BASE / Depósito</b>').addTo(map);
+      markerLayers.push(bm);
+
+      route.groupIndices.forEach((grpPtIdx,si)=>{
+        const grp=GROUPS[grpPtIdx-1];
+        const dayIdx=ptDayMap[grpPtIdx]??0;
+        const dayColor=DAY_COLORS[dayIdx%DAY_COLORS.length];
+
+        // Transformer marker (square icon, day color)
+        const tm=L.marker([grp.trafo.lat,grp.trafo.lon],{icon:mkTrafoIcon(si+1,dayColor),zIndexOffset:600})
+          .bindPopup(`<b>Trafo ${grp.id}</b><br>
+            <span style="color:#94a3b8">${grp.apoyos.length+1} apoyos · ${grp.totalClients} clientes</span><br>
+            <span style="color:#f5a623;font-size:10px">⏱ ${fmtTMin(grp.totalTime)} inspección</span><br>
+            <span style="color:#f5a623;font-size:10px">📅 ${getWorkingDay(dayIdx,cfg.noWeekend).label}</span>`)
+          .addTo(map);
+        markerLayers.push(tm);
+
+        // Apoyo markers + dashed walking lines
+        const apoyoPts=[grp.trafo,...grp.apoyos];
+        apoyoPts.forEach(a=>{
+          const am=L.marker([a.lat,a.lon],{icon:mkApoyoIcon(dayColor),zIndexOffset:500})
+            .bindPopup(`<b>Apoyo ${a.idApoyo}</b><br><span style="color:#94a3b8">${a.clientes} clientes</span>`)
+            .addTo(map);
+          markerLayers.push(am);
+        });
+
+        // Dashed walking line within group (NN order)
+        if(apoyoPts.length>1){
+          const visited=new Set([0]);
+          let cur=0;
+          const walkCoords=[[apoyoPts[0].lat,apoyoPts[0].lon]];
+          while(visited.size<apoyoPts.length){
+            let best=-1,bd=Infinity;
+            for(let j=0;j<apoyoPts.length;j++){
+              if(visited.has(j)) continue;
+              const d=haversineKm(apoyoPts[cur].lat,apoyoPts[cur].lon,apoyoPts[j].lat,apoyoPts[j].lon);
+              if(d<bd){bd=d;best=j;}
+            }
+            visited.add(best); cur=best;
+            walkCoords.push([apoyoPts[best].lat,apoyoPts[best].lon]);
+          }
+          const wl=L.polyline(walkCoords,{color:dayColor,weight:2,opacity:.7,dashArray:'5,6'}).addTo(map);
+          markerLayers.push(wl);
+        }
+      });
+
+      gRouteLayers.push({line:lineLayer,markers:markerLayers,visible:true});
+    }
+
+    setProgress(95,'Generando cronograma...');
+
+    // Summary
+    const totalGroups=GROUPS.length;
+    const totalClients=GROUPS.reduce((s,g)=>s+g.totalClients,0);
+    const daysUsed=new Set(gSchedules.flat().filter(e=>!e.overflow).map(e=>e.date)).size;
+    document.getElementById('s-trafos').textContent=totalGroups;
+    document.getElementById('s-clients').textContent=totalClients;
+    document.getElementById('s-days').textContent=daysUsed;
+    document.getElementById('s-dist').textContent=fmtKm(totalDist);
+    document.getElementById('summary').classList.add('show');
+
+    renderRoutesPane(routes,gSchedules,cfg);
+    renderSchedulePane(routes,gSchedules,cfg);
+
+    map.fitBounds([...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]],{padding:[30,30]});
+    setProgress(100,'¡Listo!');
+    showLoading(false);
+    document.getElementById('export-strip').style.display='block';
+    document.getElementById('export-btn').disabled=false;
+
+  }catch(err){
+    showLoading(false);
+    toast('Error: '+err.message);
+    console.error(err);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TOGGLE ROUTE VISIBILITY
+// ══════════════════════════════════════════════════════════════
+function toggleRoute(ri,btn){
+  const rl=gRouteLayers[ri];
+  if(!rl) return;
+  rl.visible=!rl.visible;
+  if(rl.visible){if(rl.line)map.addLayer(rl.line);rl.markers.forEach(m=>map.addLayer(m));btn.classList.remove('hidden-route');}
+  else{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>map.removeLayer(m));btn.classList.add('hidden-route');}
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER: ROUTES PANE
+// ══════════════════════════════════════════════════════════════
+function renderRoutesPane(routes,schedules,cfg){
+  const pane=document.getElementById('pane-rutas');
+  pane.innerHTML='';
+  pane.style.cssText='padding:11px;gap:8px;display:flex;flex-direction:column';
+
+  // Visibility strip
+  if(routes.length>1){
+    const strip=document.createElement('div');
+    strip.className='vis-strip';
+    routes.forEach((route,ri)=>{
+      const btn=document.createElement('button');
+      btn.className='vis-btn';
+      btn.style.borderColor=route.color;
+      btn.style.color=route.color;
+      btn.innerHTML=`<span style="width:8px;height:8px;border-radius:50%;background:${route.color};display:inline-block"></span>${route.name}`;
+      btn.addEventListener('click',()=>toggleRoute(ri,btn));
+      strip.appendChild(btn);
+    });
+    pane.appendChild(strip);
+  }
+
+  // Day legend
+  const allDayIdx=[...new Set(schedules.flat().filter(e=>!e.overflow).map(e=>e.dayIdx))].sort((a,b)=>a-b);
+  if(allDayIdx.length>1){
+    const legend=document.createElement('div');
+    legend.className='day-legend';
+    legend.innerHTML=`<div class="dl-title">Color marcador = día de inspección</div>`;
+    allDayIdx.forEach(di=>{
+      const wd=getWorkingDay(di,cfg.noWeekend);
+      const c=DAY_COLORS[di%DAY_COLORS.length];
+      const row=document.createElement('div');
+      row.className='dl-row';
+      row.innerHTML=`<div style="width:10px;height:10px;border-radius:3px;background:${c};flex-shrink:0;border:1px solid rgba(255,255,255,.2)"></div> Día ${di+1} · ${wd.date}`;
+      legend.appendChild(row);
+    });
+    pane.appendChild(legend);
+  }
+
+  // Route cards
+  routes.forEach((route,ri)=>{
+    const sched=schedules[ri];
+    const ptDayMap={};
+    sched.forEach(e=>{if(!e.overflow)ptDayMap[e.grpPtIdx]=e.dayIdx;});
+    const inspGroups=route.groupIndices.map(i=>GROUPS[i-1]);
+
+    const card=document.createElement('div');
+    card.className='route-card';
+    card.innerHTML=`
+      <div class="rc-hdr">
+        <div class="rc-dot" style="background:${route.color}"></div>
+        <div class="rc-title">${route.name} — ${route.sup}</div>
+        <div class="rc-meta">
+          <div class="rc-dist" style="color:${route.color}">${route.distance?fmtKm(route.distance):'—'}</div>
+          <div class="rc-time">${inspGroups.length} transformadores</div>
+        </div>
+        <div class="rc-arr">▼</div>
+      </div>
+      <div class="rc-body">
+        ${inspGroups.map((grp,i)=>{
+          const ptIdx=route.groupIndices[i];
+          const dayIdx=ptDayMap[ptIdx]??0;
+          const dc=DAY_COLORS[dayIdx%DAY_COLORS.length];
+          const wd=getWorkingDay(dayIdx,cfg.noWeekend);
+          return `<div class="grp-row">
+            <div class="grp-row-hdr">
+              <div class="grp-badge" style="background:${dc};color:${needsLightText(dc)?'#fff':'#111'}">${i+1}</div>
+              <div class="grp-id">Trafo ${grp.id}</div>
+              <div class="grp-day" style="background:${dc};color:${needsLightText(dc)?'#fff':'#111'}">${wd.date}</div>
+              <div class="grp-meta">${fmtTMin(grp.totalTime)}</div>
+            </div>
+            <div class="grp-detail">
+              <span class="grp-chip">${grp.apoyos.length+1} apoyos</span>
+              <span class="grp-chip">${grp.totalClients} clientes</span>
+              <span class="grp-chip">🚶 ${fmtTMin(grp.walkTime)}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    card.querySelector('.rc-hdr').addEventListener('click',()=>{
+      card.querySelector('.rc-body').classList.toggle('open');
+      card.querySelector('.rc-arr').classList.toggle('open');
+    });
+    pane.appendChild(card);
+  });
+
+  const fb=pane.querySelector('.rc-body'),fa=pane.querySelector('.rc-arr');
+  if(fb){fb.classList.add('open');fa.classList.add('open');}
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER: SCHEDULE PANE
+// ══════════════════════════════════════════════════════════════
+function renderSchedulePane(routes,schedules,cfg){
+  const inner=document.getElementById('sched-inner');
+  inner.innerHTML='';
+
+  const dayMap={};
+  const overflows=[];
+  schedules.forEach((sched,ri)=>{
+    sched.forEach(e=>{
+      if(e.overflow){overflows.push({ri,e});return;}
+      if(!dayMap[e.date])dayMap[e.date]={wd:{date:e.date,label:e.dateLabel},entries:[]};
+      dayMap[e.date].entries.push({ri,e});
+    });
+  });
+
+  // Sort days
+  Object.keys(dayMap).sort().forEach(date=>{
+    const{wd,entries}=dayMap[date];
+    const byRoute={};
+    entries.forEach(({ri,e})=>{if(!byRoute[ri])byRoute[ri]=[];byRoute[ri].push({ri,e});});
+
+    const card=document.createElement('div');
+    card.className='day-card';
+    let html=`<div class="day-hdr"><div class="day-date-txt">${wd.date}</div><div class="day-label-txt">${wd.label}</div></div><div class="day-body">`;
+
+    Object.keys(byRoute).forEach(ri=>{
+      const route=routes[+ri];
+      const rEntries=byRoute[ri];
+      const lastE=rEntries[rEntries.length-1].e;
+      const baseRet=lastE.effectiveDep+lastE.retMin;
+
+      html+=`<div class="sched-sup" style="color:${route.color}">
+        <span style="width:8px;height:8px;border-radius:50%;background:${route.color};display:inline-block"></span>
+        ${route.name} · ${route.sup}
+      </div>`;
+
+      rEntries.forEach(({e},ei)=>{
+        const grp=GROUPS[e.grpIdx];
+        const dc=DAY_COLORS[e.dayIdx%DAY_COLORS.length];
+
+        // Travel row
+        if(e.travelMin>0.5){
+          html+=`<div class="sched-travel">🚗 +${fmtTMin(e.travelMin)} traslado</div>`;
+        }
+
+        // Lunch before
+        if(e.lunchApplied&&e.lunchBefore){
+          html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
+        }
+
+        // Inspection block
+        html+=`<div class="sched-grp">
+          <div class="sched-grp-hdr">
+            <div class="sched-grp-time" style="color:${route.color}">${minToT(e.arrMin)}</div>
+            <div class="sched-grp-dash">→</div>
+            <div class="sched-grp-end">${minToT(e.depMin)}</div>
+            <div class="sched-grp-id">Trafo ${grp.id}</div>
+            <div class="sched-grp-kva" style="background:${dc};color:${needsLightText(dc)?'#fff':'#111'}">${grp.totalClients} cl.</div>
+          </div>
+          <div class="sched-grp-detail">
+            <span class="sched-chip">${grp.apoyos.length+1} apoyos</span>
+            <span class="sched-chip">⚡ ${fmtTMin(grp.inspTime)}</span>
+            <span class="sched-chip walk">🚶 ${fmtTMin(grp.walkTime)}</span>
+          </div>
+        </div>`;
+
+        // Lunch after
+        if(e.lunchApplied&&!e.lunchBefore){
+          html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
+        }
+      });
+
+      html+=`<div class="sched-return">🏠 ${minToT(baseRet)} — Regreso a base</div>`;
+    });
+
+    html+=`</div>`;
+    card.innerHTML=html;
+    inner.appendChild(card);
+  });
+
+  if(overflows.length){
+    const card=document.createElement('div');
+    card.className='day-card';
+    card.style.borderColor='var(--red)';
+    let html=`<div class="day-hdr" style="background:rgba(239,68,68,.07)">
+      <div class="day-date-txt" style="color:var(--red)">⚠ SIN FECHA</div>
+      <div class="day-label-txt">No calculados — revisar configuración</div>
+    </div><div class="day-body">`;
+    overflows.forEach(({ri,e})=>{
+      const grp=GROUPS[e.grpIdx];
+      html+=`<div class="overflow-row">⚠ Trafo ${grp.id} · ${grp.totalClients} clientes · ${fmtTMin(grp.totalTime)} (${gRoutes[ri].name})</div>`;
+    });
+    html+=`</div>`;
+    card.innerHTML=html;
+    inner.appendChild(card);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CSV EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportCSV(){
+  if(!gRoutes.length){toast('Calculá primero.');return;}
+  const rows=[['Supervisor','Ruta','Fecha','Día','Nro Orden','ID Transformador','Apoyos Totales','Clientes Totales','Clientes Trafo','Hora Llegada','Fin Inspección','Tiempo Inspección (min)','Tiempo Caminata (min)','Almuerzo','Hora Regreso Base']];
+
+  gRoutes.forEach((route,ri)=>{
+    const sched=gSchedules[ri];
+    const byDay={};
+    sched.filter(e=>!e.overflow).forEach(e=>{if(!byDay[e.date])byDay[e.date]=[];byDay[e.date].push(e);});
+    let stop=0;
+
+    sched.forEach(e=>{
+      const grp=GROUPS[e.grpIdx]; stop++;
+      if(e.overflow){
+        rows.push([route.sup,route.name,'SIN FECHA','—',stop,grp.id,grp.apoyos.length+1,grp.totalClients,grp.trafo.clientes,'—','—',grp.inspTime.toFixed(1),grp.walkTime.toFixed(1),'—','—']);
+        return;
+      }
+      const dayE=byDay[e.date];
+      const isLast=dayE&&dayE[dayE.length-1]===e;
+      const retBase=isLast?minToT(e.effectiveDep+e.retMin):'';
+      const almuerzo=e.lunchApplied?`${minToT(e.lunchBreakStart)}-${minToT(e.lunchBreakEnd)}`:'';
+      rows.push([route.sup,route.name,e.date,e.dateLabel,stop,grp.id,grp.apoyos.length+1,grp.totalClients,grp.trafo.clientes,minToT(e.arrMin),minToT(e.depMin),grp.inspTime.toFixed(1),grp.walkTime.toFixed(1),almuerzo,retBase]);
+    });
+    rows.push([]);
+  });
+
+  const csv='\ufeff'+rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`cronograma_transformadores_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
