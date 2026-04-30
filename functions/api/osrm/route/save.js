@@ -12,7 +12,7 @@ function json(data, status = 200) {
 
 export async function onRequestOptions() {
   return json({ ok: true });
-} 
+}
 
 export async function onRequestPost({ request, env }) {
   try {
@@ -33,9 +33,12 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "batch_id, id_trafo y request_hash son obligatorios" }, 400);
     }
 
-    if (!walk_geom || !walk_order || walk_time_min === undefined) {
-      return json({ ok: false, error: "walk_geom, walk_order y walk_time_min son obligatorios" }, 400);
+    if (!walk_order || walk_time_min === undefined) {
+      return json({ ok: false, error: "walk_order y walk_time_min son obligatorios" }, 400);
     }
+
+    // walk_geom es opcional — puede ser null o un objeto vacío
+    const geomToSave = walk_geom ?? { type: 'LineString', coordinates: [] };
 
     await env.DB.prepare(`
       INSERT INTO osrm_transformador_routes (
@@ -56,7 +59,7 @@ export async function onRequestPost({ request, env }) {
       id_trafo,
       request_hash,
       status,
-      JSON.stringify(walk_geom),
+      JSON.stringify(geomToSave),
       walk_time_min,
       JSON.stringify(walk_order),
       error_message
