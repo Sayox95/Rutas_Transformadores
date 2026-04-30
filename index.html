@@ -341,7 +341,7 @@ body{display:flex}
 
   <div id="footer">
     <div class="fdot"></div>
-    OSRM geometría vial · Haversine × factor tráfico para matriz · Walking haversine entre apoyos
+    OSRM estricto para rutas walking y geometría vial · sin fallback local
   </div>
 </div>
 
@@ -505,8 +505,7 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
     g.inspTime = inspTrafoMin
       + g.trafo.clientes * inspClientMin
       + g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0);
-    // walkTime and walkGeom set later by computeAllGroupWalking
-    // Set haversine as initial fallback
+    // walkTime and walkGeom set later by computeAllGroupWalking using OSRM
     g.walkTime = 0;
     g.walkGeom = null;
     g.walkOrder = [g.trafo,...g.apoyos]; // default order
@@ -517,16 +516,17 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 // ── OSRM helpers ──────────────────────────────────────────────
 // The public OSRM demo server has usage limits and may hang/timeout.
 // Keep calls controlled: timeout every fetch, retry failures, and avoid parallel walking requests.
-const OSRM_TIMEOUT_MS = 20000;
-const OSRM_RETRY_WAIT_MS = 3000;
-const OSRM_REQUEST_GAP_MS = 350;
+const OSRM_TIMEOUT_MS = 15000;
+const OSRM_RETRY_WAIT_MS = 2500;
+const OSRM_REQUEST_GAP_MS = 900;
+const OSRM_MAX_ATTEMPTS = 8;
 
 function sleep(ms){
   return new Promise(resolve=>setTimeout(resolve,ms));
 }
 
-// Backward-compatible wrapper: if any old code path still calls withTimeout(fetch(...)),
-// this prevents ReferenceError and applies a timeout to generic promises.
+// Compatibilidad: si alguna ruta vieja todavía llama withTimeout(fetch(...)),
+// no vuelve a aparecer ReferenceError.
 function withTimeout(promise, timeoutMs=OSRM_TIMEOUT_MS){
   let timeoutId;
   const timeoutPromise = new Promise((_, reject)=>{
@@ -554,72 +554,95 @@ async function fetchWithTimeout(url, options={}, timeoutMs=OSRM_TIMEOUT_MS){
   }
 }
 
-// Retry wrapper — 3 attempts with 3s wait between each
-async function withRetry(fn, attempts=3, waitMs=OSRM_RETRY_WAIT_MS){
+function isRetryableOSRMError(err){
+  const msg=String(err && err.message ? err.message : err).toLowerCase();
+  return msg.includes('timeout') || msg.includes('http 429') || msg.includes('http 500') ||
+         msg.includes('http 502') || msg.includes('http 503') || msg.includes('http 504') ||
+         msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed');
+}
+
+// Retry estricto: no usa Haversine como fallback. Si OSRM no responde, reintenta
+// con espera progresiva; al agotar intentos detiene el cálculo con error claro.
+async function withRetry(fn, attempts=OSRM_MAX_ATTEMPTS, waitMs=OSRM_RETRY_WAIT_MS, label='OSRM'){
   let lastErr;
   for(let i=0;i<attempts;i++){
     try{
-      return await fn();
+      return await fn(i+1);
     }catch(e){
       lastErr=e;
-      if(i===attempts-1) throw e; // last attempt — rethrow
-      await sleep(waitMs);
+      const retryable=isRetryableOSRMError(e);
+      console.warn(`${label} intento ${i+1}/${attempts} falló:`, e);
+      if(i===attempts-1 || !retryable) break;
+      const backoff=waitMs*(i+1);
+      await sleep(backoff);
     }
   }
   throw lastErr;
 }
 
-async function osrmWalkingTable(pts){
+async function osrmWalkingTable(pts, progressLabel=''){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
   return withRetry(async()=>{
     const res=await fetchWithTimeout(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`);
     if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
     const d=await res.json();
-    if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
+    if(d.code!=='Ok') throw new Error('OSRM walking: '+(d.message||d.code));
+    if(!Array.isArray(d.durations) || !d.durations.length) throw new Error('OSRM walking table vacía');
     return d.durations;
-  });
+  }, OSRM_MAX_ATTEMPTS, OSRM_RETRY_WAIT_MS, progressLabel || 'OSRM walking table');
 }
 
-async function osrmWalkingRoute(pts){
+async function osrmWalkingRoute(pts, progressLabel=''){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
   return withRetry(async()=>{
     const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`);
     if(!res.ok) throw new Error(`walking route HTTP ${res.status}`);
     const d=await res.json();
-    if(d.code!=='Ok') throw new Error('OSRM walking route: '+d.message);
+    if(d.code!=='Ok') throw new Error('OSRM walking route: '+(d.message||d.code));
+    if(!d.routes || !d.routes[0]) throw new Error('OSRM walking route sin rutas');
     return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
-  });
+  }, OSRM_MAX_ATTEMPTS, OSRM_RETRY_WAIT_MS, progressLabel || 'OSRM walking route');
 }
 
 async function computeGroupWalking(grp){
   const pts=[grp.trafo,...grp.apoyos];
+  grp.walkFallback=false;
+  grp.walkFallbackReason='';
+
   if(pts.length<=1){
     grp.walkTime=0; grp.walkGeom=null; grp.walkOrder=pts;
     grp.totalTime=grp.inspTime; return;
   }
 
-  // 1. Get walking time matrix — throws after 3 retries if fails
-  const mat=await osrmWalkingTable(pts);
+  const label=`Trafo ${grp.id}`;
+  const mat=await osrmWalkingTable(pts, `${label} · tabla walking`);
 
-  // 2. TSP — NN starting from trafo (index 0)
+  // TSP — vecino más cercano empezando en transformador (índice 0)
   const order=[0];
   const rem=new Set(pts.map((_,i)=>i).slice(1));
   while(rem.size>0){
     const last=order[order.length-1];
     let best=-1,bd=Infinity;
-    rem.forEach(j=>{const d=mat[last][j];if(d<bd){bd=d;best=j;}});
+    rem.forEach(j=>{
+      const d=mat[last]?.[j];
+      if(Number.isFinite(d) && d<bd){bd=d;best=j;}
+    });
+    if(best<0) throw new Error(`OSRM devolvió matriz incompleta para ${label}`);
     order.push(best); rem.delete(best);
   }
 
-  // 3. 2-opt improvement
+  // 2-opt improvement usando únicamente matriz OSRM
   let imp=true;
   while(imp){
     imp=false;
     for(let i=1;i<order.length-1;i++){
       for(let j=i+1;j<order.length;j++){
-        const before=mat[order[i-1]][order[i]]+(j+1<order.length?mat[order[j]][order[j+1]]:0);
-        const after =mat[order[i-1]][order[j]]+(j+1<order.length?mat[order[i]][order[j+1]]:0);
-        if(after<before-0.01){
+        const a=mat[order[i-1]]?.[order[i]];
+        const b=j+1<order.length?mat[order[j]]?.[order[j+1]]:0;
+        const c=mat[order[i-1]]?.[order[j]];
+        const d=j+1<order.length?mat[order[i]]?.[order[j+1]]:0;
+        if(!Number.isFinite(a)||!Number.isFinite(b)||!Number.isFinite(c)||!Number.isFinite(d)) continue;
+        if(c+d<a+b-0.01){
           order.splice(i,j-i+1,...order.slice(i,j+1).reverse());
           imp=true;
         }
@@ -629,23 +652,20 @@ async function computeGroupWalking(grp){
 
   grp.walkOrder=order.map(i=>pts[i]);
 
-  // 4. Get walking route geometry — throws after 3 retries if fails
-  const rd=await osrmWalkingRoute(grp.walkOrder);
+  // Geometría real OSRM. Si falla, NO se usa línea recta: se detiene con error.
+  const rd=await osrmWalkingRoute(grp.walkOrder, `${label} · ruta walking`);
   grp.walkTime=rd.duration/60;
   grp.walkGeom=rd.geom;
   grp.totalTime=grp.inspTime+grp.walkTime;
 }
 
 async function computeAllGroupWalking(groups, onProgress){
-  // Public OSRM: process one transformer group at a time to avoid concurrent bursts.
-  const BATCH=1;
-  for(let i=0;i<groups.length;i+=BATCH){
-    const batch=groups.slice(i,Math.min(i+BATCH,groups.length));
-    for(const g of batch){
-      await computeGroupWalking(g);
-      await sleep(OSRM_REQUEST_GAP_MS);
-    }
-    onProgress(i+batch.length, groups.length);
+  for(let i=0;i<groups.length;i++){
+    const grp=groups[i];
+    onProgress(i, groups.length, `Calculando OSRM para transformador ${grp.id}...`);
+    await computeGroupWalking(grp);
+    onProgress(i+1, groups.length, `OSRM completado para transformador ${grp.id}`);
+    await sleep(OSRM_REQUEST_GAP_MS);
   }
 }
 
@@ -1016,8 +1036,9 @@ async function calculateAll(){
 
     setProgress(15,'Calculando rutas a pie entre apoyos (OSRM walking)...');
     computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
-    await computeAllGroupWalking(GROUPS,(done,total)=>{
-      setProgress(15+Math.round((done/total)*20),`Rutas a pie: ${done}/${total} transformadores...`);
+    await computeAllGroupWalking(GROUPS,(done,total,msg)=>{
+      const pct = total ? 15+Math.round((done/total)*20) : 15;
+      setProgress(pct, msg || `Rutas a pie OSRM: ${done}/${total} transformadores...`);
     });
 
     setProgress(38,'Calculando matriz de distancias vehiculares...');
@@ -1069,11 +1090,7 @@ async function calculateAll(){
         totalDist+=rd.distance; totalDur+=route.duration;
         lineLayer=L.geoJSON(rd.geom,{style:{color:route.color,weight:4,opacity:.85,lineCap:'round',lineJoin:'round'}}).addTo(map);
       } else {
-        // Fallback: straight lines + haversine distance
-        let d=0;
-        for(let i=0;i<route.points.length-1;i++) d+=haversineKm(route.points[i].lat,route.points[i].lon,route.points[i+1].lat,route.points[i+1].lon)*1350;
-        route.distance=d; totalDist+=d;
-        lineLayer=L.polyline(route.points.map(p=>[p.lat,p.lon]),{color:route.color,weight:4,opacity:.85}).addTo(map);
+        throw new Error(`OSRM driving no devolvió geometría para ${route.name}`);
       }
 
       // Markers
@@ -1107,17 +1124,12 @@ async function calculateAll(){
 
         // Walking line — use OSRM geometry if available, else straight lines
         if(grp.walkOrder.length>1){
-          let wl;
-          if(grp.walkGeom){
-            // Real street geometry from OSRM walking
-            wl=L.geoJSON(grp.walkGeom,{
-              style:{color:dayColor,weight:2.5,opacity:.8,dashArray:'6,5'}
-            }).addTo(map);
-          } else {
-            // Fallback: straight lines between apoyos
-            const walkCoords=grp.walkOrder.map(a=>[a.lat,a.lon]);
-            wl=L.polyline(walkCoords,{color:dayColor,weight:2.5,opacity:.7,dashArray:'6,5'}).addTo(map);
+          if(!grp.walkGeom){
+            throw new Error(`OSRM walking no devolvió geometría para Trafo ${grp.id}`);
           }
+          const wl=L.geoJSON(grp.walkGeom,{
+            style:{color:dayColor,weight:2.5,opacity:.8,dashArray:'6,5'}
+          }).addTo(map);
           markerLayers.push(wl);
         }
       });
