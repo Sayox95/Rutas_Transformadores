@@ -515,32 +515,22 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 }
 
 // ── OSRM Walking per group ────────────────────────────────────
-// Timeout wrapper — if OSRM doesn't respond, fall back to haversine
-function withTimeout(promise, ms=8000){
-  return Promise.race([
-    promise,
-    new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))
-  ]);
-}
-
 async function osrmWalkingTable(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  const res=await withTimeout(fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`));
+  const res=await fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`);
   if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
   const d=await res.json();
   if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
-  return d.durations;
+  return d.durations; // seconds matrix
 }
 
 async function osrmWalkingRoute(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  try{
-    const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`));
-    if(!res.ok) return null;
-    const d=await res.json();
-    if(d.code!=='Ok') return null;
-    return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
-  }catch(e){return null;}
+  const res=await fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`);
+  if(!res.ok) return null;
+  const d=await res.json();
+  if(d.code!=='Ok') return null;
+  return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
 }
 
 async function computeGroupWalking(grp){
@@ -608,7 +598,7 @@ async function computeGroupWalking(grp){
 }
 
 async function computeAllGroupWalking(groups, onProgress){
-  const BATCH=3;
+  const BATCH=5;
   for(let i=0;i<groups.length;i+=BATCH){
     const batch=groups.slice(i,Math.min(i+BATCH,groups.length));
     await Promise.all(batch.map(g=>computeGroupWalking(g)));
