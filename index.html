@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspección Transformadores - Corregido v2</title>
+<title>Inspección Transformadores</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -16,25 +16,17 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'IBM Plex Sans',sans-serif;color:var(--text)}
 body{display:flex}
-
-/* ─── SIDEBAR ─── */
 #sidebar{width:375px;min-width:375px;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--border);overflow:hidden;z-index:900;height:100vh}
-
-/* ─── HEADER ─── */
 #hdr{padding:13px 18px 10px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
 .hdr-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px}
 #hdr h1{font-size:13px;font-weight:700;line-height:1.4}
 #hdr p{font-size:10px;color:var(--muted);margin-top:2px;font-family:'IBM Plex Mono',monospace}
-
-/* ─── CONTROLS ─── */
 #ctrl{padding:11px 16px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0;overflow-y:auto;max-height:55vh}
 #ctrl::-webkit-scrollbar{width:3px}
 #ctrl::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .ctrl-section{margin-bottom:10px}
 .ctrl-section:last-child{margin-bottom:0}
 .ctrl-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:5px;display:block}
-
-/* CSV drop */
 #csv-drop{border:1.5px dashed var(--border);border-radius:8px;padding:14px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
 #csv-drop:hover,#csv-drop.drag{border-color:var(--accent);background:rgba(245,166,35,.04)}
 #csv-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
@@ -47,18 +39,13 @@ body{display:flex}
 .csv-fcount{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:1px}
 .csv-clear{background:none;border:1px solid var(--border);color:var(--muted);border-radius:5px;padding:3px 7px;font-size:10px;cursor:pointer;font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0}
 .csv-clear:hover{border-color:var(--red);color:var(--red)}
-
-/* Grid inputs */
 .cfg-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
-.cfg-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px}
 .cfg-field{display:flex;flex-direction:column;gap:3px}
 .cfg-field label{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:.8px}
 .cfg-input{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 7px;font-size:11px;font-family:'IBM Plex Mono',monospace;outline:none;transition:border-color .15s;width:100%}
 .cfg-input:focus{border-color:var(--accent)}
 .cfg-input[type=number]{-moz-appearance:textfield}
 .cfg-input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
-
-/* Toggle */
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;background:var(--bg);border:1px solid var(--border);border-radius:7px;margin-bottom:6px}
 .toggle-lbl{font-size:11px;color:var(--text)}
 .toggle-sub{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
@@ -68,17 +55,12 @@ body{display:flex}
 .sw input:checked+.sw-track{background:var(--accent)}
 .sw-thumb{position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;top:3px;left:3px;transition:left .2s;pointer-events:none}
 .sw input:checked~.sw-thumb{left:18px}
-
-/* Lunch fields */
 #lunch-fields{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;overflow:hidden;transition:max-height .25s,opacity .25s;max-height:60px;opacity:1}
 #lunch-fields.hidden{max-height:0;opacity:0;pointer-events:none}
-
-/* N buttons */
 .n-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:8px}
 .n-btn{padding:6px 4px;background:var(--panel);border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-size:11px;font-family:'IBM Plex Mono',monospace;transition:all .15s;text-align:center}
 .n-btn:hover{border-color:var(--accent);color:var(--accent)}
 .n-btn.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
-
 #calc-btn{width:100%;padding:10px;background:var(--accent);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px}
 #calc-btn:hover{background:#e09515;transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,166,35,.3)}
 #calc-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none}
@@ -86,47 +68,33 @@ body{display:flex}
 .cache-btn{padding:7px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:7px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s}
 .cache-btn:hover{border-color:var(--accent);color:var(--accent)}
 .cache-status{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:6px;line-height:1.35}
-
-/* ─── LOADING ─── */
 #loading{display:none;flex-direction:column;align-items:center;padding:12px 16px;gap:7px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
 #loading.show{display:flex}
 .pbar-wrap{width:100%;background:var(--border);border-radius:4px;height:3px;overflow:hidden}
 .pbar{height:100%;background:var(--accent);border-radius:4px;transition:width .4s ease}
 #load-msg{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
-
-/* ─── SUMMARY ─── */
 #summary{display:none;padding:7px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
 #summary.show{display:flex}
 .sum-s{flex:1;text-align:center;padding:0 2px}
 .sum-s+.sum-s{border-left:1px solid var(--border)}
 .sum-v{font-size:14px;font-weight:700;font-family:'IBM Plex Mono',monospace;color:var(--accent)}
 .sum-l{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:1px}
-
-/* ─── TABS ─── */
 #tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
 .tab-btn{flex:1;padding:8px;font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;background:none;border:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;letter-spacing:.5px}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
-
-/* ─── TAB BODY ─── */
 #tab-body{flex:1;overflow:hidden;position:relative;min-height:0}
 .tab-pane{position:absolute;inset:0;overflow-y:auto;display:none;flex-direction:column}
 .tab-pane.active{display:flex}
 .tab-pane::-webkit-scrollbar{width:4px}
 .tab-pane::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-
-/* ─── RUTAS PANE ─── */
 #pane-rutas{padding:11px;gap:8px}
 .empty-state{padding:24px;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
 .vis-strip{display:flex;gap:5px;flex-wrap:wrap}
 .vis-btn{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;border:1.5px solid;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .18s;background:transparent}
 .vis-btn.hidden-route{opacity:.35;filter:grayscale(.7)}
-
-/* Day legend */
 .day-legend{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
 .dl-title{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px}
 .dl-row{display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
-
-/* Route cards */
 .route-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0}
 .rc-hdr{display:flex;align-items:center;padding:9px 12px;gap:8px;cursor:pointer;user-select:none}
 .rc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -138,8 +106,6 @@ body{display:flex}
 .rc-arr.open{transform:rotate(180deg)}
 .rc-body{display:none;padding:0 12px 9px}
 .rc-body.open{display:block}
-
-/* Group stop rows */
 .grp-row{padding:6px 0;border-top:1px solid var(--border)}
 .grp-row-hdr{display:flex;align-items:center;gap:7px}
 .grp-badge{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;font-family:'IBM Plex Mono',monospace;border:1.5px solid rgba(255,255,255,.2)}
@@ -148,23 +114,18 @@ body{display:flex}
 .grp-day{font-size:8px;font-family:'IBM Plex Mono',monospace;padding:2px 5px;border-radius:3px;font-weight:700}
 .grp-detail{padding-left:31px;margin-top:3px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:4px}
 .grp-chip{background:var(--border);padding:1px 5px;border-radius:3px}
-
-/* ─── CRONOGRAMA PANE ─── */
 #pane-cron{padding:0;gap:0}
 .export-strip{padding:9px 13px;border-bottom:1px solid var(--border);background:var(--card);flex-shrink:0}
 #export-btn{width:100%;padding:8px;background:var(--blue);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'IBM Plex Sans',sans-serif}
 #export-btn:hover{background:#2563eb;transform:translateY(-1px)}
 #export-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none}
 #sched-inner{padding:9px;display:flex;flex-direction:column;gap:8px}
-
 .day-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;flex-shrink:0}
 .day-hdr{padding:7px 12px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
 .day-date-txt{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:var(--accent)}
 .day-label-txt{font-size:10px;color:var(--muted)}
 .day-body{padding:3px 0}
 .sched-sup{padding:5px 12px 2px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-top:4px;display:flex;align-items:center;gap:5px}
-
-/* Schedule rows */
 .sched-travel{display:flex;align-items:center;gap:7px;padding:3px 12px;font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;border-top:1px solid var(--border);font-style:italic}
 .sched-grp{border-top:1px solid var(--border);padding:5px 12px}
 .sched-grp-hdr{display:flex;align-items:center;gap:7px}
@@ -176,39 +137,28 @@ body{display:flex}
 .sched-grp-detail{padding-left:92px;margin-top:2px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;display:flex;flex-wrap:wrap;gap:3px}
 .sched-chip{background:var(--border);padding:1px 5px;border-radius:3px}
 .sched-chip.walk{background:rgba(148,163,184,.12);color:var(--walk)}
-
 .sched-lunch{display:flex;align-items:center;gap:7px;padding:4px 12px;border-top:1px solid var(--border);font-size:10px;font-family:'IBM Plex Mono',monospace;color:#a16207;background:rgba(161,98,7,.07)}
 .sched-return{display:flex;align-items:center;gap:5px;padding:4px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-style:italic}
 .overflow-row{display:flex;align-items:center;gap:5px;padding:4px 12px;font-size:10px;color:var(--red);border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace}
-
-/* ─── FOOTER ─── */
 #footer{padding:6px 14px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);display:flex;align-items:center;gap:5px;background:var(--bg);flex-shrink:0}
 .fdot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* ─── MAP ─── */
 #map{flex:1;background:#1a1f2e}
 .leaflet-tile{filter:brightness(.82) saturate(.65)}
 .leaflet-popup-content-wrapper{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
 .leaflet-popup-tip{background:var(--card)}
 .leaflet-popup-close-button{color:var(--muted)!important}
-
-/* ─── TOAST ─── */
 #toast{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;padding:9px 18px;border-radius:8px;font-size:11px;z-index:9999;font-family:'IBM Plex Mono',monospace;max-width:340px;text-align:center}
 </style>
 </head>
 <body>
-
 <div id="sidebar">
   <div id="hdr">
     <div class="hdr-tag">⚡ Inspección Redes Eléctricas</div>
     <h1>Ruteo de Transformadores<br>y Clientes Asociados</h1>
     <p id="hdr-sub">Cargá un CSV para comenzar · OSRM + OpenStreetMap</p>
   </div>
-
   <div id="ctrl">
-
-    <!-- CSV -->
     <div class="ctrl-section">
       <span class="ctrl-label">Archivo de datos</span>
       <div id="csv-drop">
@@ -226,20 +176,14 @@ body{display:flex}
         <button class="csv-clear" id="csv-clear">✕ Cambiar</button>
       </div>
     </div>
-
-    <!-- Base point -->
     <div class="ctrl-section">
       <span class="ctrl-label">Punto de partida / Base</span>
       <div class="cfg-row">
         <div class="cfg-field"><label>LATITUD</label><input class="cfg-input" type="number" id="cfg-blat" value="15.488029" step="0.000001"></div>
         <div class="cfg-field"><label>LONGITUD</label><input class="cfg-input" type="number" id="cfg-blon" value="-87.979872" step="0.000001"></div>
       </div>
-      <button id="base-apply-btn" style="width:100%;padding:5px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s">
-        📍 Actualizar base en el mapa
-      </button>
+      <button id="base-apply-btn" style="width:100%;padding:5px;background:var(--bg);border:1px solid var(--border);color:var(--muted);border-radius:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;cursor:pointer;transition:all .15s">📍 Actualizar base en el mapa</button>
     </div>
-
-    <!-- Work hours -->
     <div class="ctrl-section">
       <span class="ctrl-label">Jornada laboral</span>
       <div class="cfg-row">
@@ -248,23 +192,13 @@ body{display:flex}
       </div>
       <div style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:-3px;margin-bottom:4px">Hacé click en las horas/minutos y usá las flechas ↑↓ para cambiar</div>
     </div>
-
-    <!-- Inspection times -->
     <div class="ctrl-section">
       <span class="ctrl-label">Tiempos de inspección</span>
       <div class="cfg-row">
-        <div class="cfg-field">
-          <label>TRAFO (MIN)</label>
-          <input class="cfg-input" type="number" id="cfg-trafo-min" value="2" min="1" max="60" step="0.5">
-        </div>
-        <div class="cfg-field">
-          <label>POR CLIENTE (MIN)</label>
-          <input class="cfg-input" type="number" id="cfg-client-min" value="2.5" min="0.5" max="30" step="0.5">
-        </div>
+        <div class="cfg-field"><label>TRAFO (MIN)</label><input class="cfg-input" type="number" id="cfg-trafo-min" value="2" min="1" max="60" step="0.5"></div>
+        <div class="cfg-field"><label>POR CLIENTE (MIN)</label><input class="cfg-input" type="number" id="cfg-client-min" value="2.5" min="0.5" max="30" step="0.5"></div>
       </div>
     </div>
-
-    <!-- Traffic factor -->
     <div class="ctrl-section">
       <span class="ctrl-label">Factor de tráfico vehicular</span>
       <div class="cfg-field">
@@ -272,8 +206,6 @@ body{display:flex}
         <input class="cfg-input" type="number" id="cfg-traffic" value="1.8" min="1.0" max="3.0" step="0.1">
       </div>
     </div>
-
-    <!-- Lunch -->
     <div class="ctrl-section">
       <span class="ctrl-label">Almuerzo</span>
       <div class="toggle-row">
@@ -285,16 +217,12 @@ body{display:flex}
         <div class="cfg-field"><label>DURACIÓN (MIN)</label><input class="cfg-input" type="number" id="cfg-ldur" value="60" min="15" max="120" step="15"></div>
       </div>
     </div>
-
-    <!-- Weekends -->
     <div class="ctrl-section">
       <div class="toggle-row" style="margin-bottom:0">
         <div><div class="toggle-lbl">Excluir fines de semana</div><div class="toggle-sub">Sábado y Domingo no laborables</div></div>
         <label class="sw"><input type="checkbox" id="cfg-noweekend" checked><div class="sw-track"></div><div class="sw-thumb"></div></label>
       </div>
     </div>
-
-    <!-- Cuadrillas -->
     <div class="ctrl-section">
       <span class="ctrl-label">Número de cuadrillas</span>
       <div class="n-btns">
@@ -308,32 +236,23 @@ body{display:flex}
         <button class="cache-btn" id="recalc-btn" disabled>↻ Recalcular desde cero</button>
         <button class="cache-btn" id="clear-cache-btn">🧹 Limpiar caché D1</button>
       </div>
-      <div class="cache-status" id="cache-status">Caché OSRM D1: listo.</div>
+      <div class="cache-status" id="cache-status">Web Worker + Caché D1: listo.</div>
     </div>
-
-  </div><!-- /ctrl -->
-
-  <!-- LOADING -->
+  </div>
   <div id="loading">
     <div style="width:100%"><div class="pbar-wrap"><div class="pbar" id="pbar" style="width:4%"></div></div></div>
     <div id="load-msg">Iniciando...</div>
   </div>
-
-  <!-- SUMMARY -->
   <div id="summary">
     <div class="sum-s"><div class="sum-v" id="s-trafos">—</div><div class="sum-l">Transformadores</div></div>
     <div class="sum-s"><div class="sum-v" id="s-clients">—</div><div class="sum-l">Clientes</div></div>
     <div class="sum-s"><div class="sum-v" id="s-days">—</div><div class="sum-l">Días estimados</div></div>
     <div class="sum-s"><div class="sum-v" id="s-dist">—</div><div class="sum-l">Distancia</div></div>
   </div>
-
-  <!-- TABS -->
   <div id="tabs">
     <button class="tab-btn active" data-tab="rutas">🗺 Rutas</button>
     <button class="tab-btn" data-tab="cron">📅 Cronograma</button>
   </div>
-
-  <!-- TAB BODY -->
   <div id="tab-body">
     <div id="pane-rutas" class="tab-pane active">
       <div class="empty-state">Cargá un CSV y presioná <b>Calcular</b> para trazar las rutas.</div>
@@ -342,84 +261,321 @@ body{display:flex}
       <div class="export-strip" id="export-strip" style="display:none">
         <button id="export-btn" disabled>⬇ Descargar Cronograma CSV</button>
       </div>
-      <div id="sched-inner">
-        <div class="empty-state">El cronograma aparecerá aquí después de calcular.</div>
-      </div>
+      <div id="sched-inner"><div class="empty-state">El cronograma aparecerá aquí después de calcular.</div></div>
     </div>
   </div>
-
-  <div id="footer">
-    <div class="fdot"></div>
-    OSRM estricto para rutas walking y geometría vial · sin fallback local
-  </div>
+  <div id="footer"><div class="fdot"></div>Web Worker · OSRM walking/driving · Caché D1 · Sin fallback local</div>
 </div>
-
 <div id="map"></div>
 <div id="toast"></div>
 
 <script>
 // ══════════════════════════════════════════════════════════════
-//  CONSTANTS
+//  WEB WORKER — código que corre en hilo separado
+//  Maneja: OSRM walking, TSP, 2-opt, caché D1
+//  El hilo principal queda libre para UI y Leaflet
+// ══════════════════════════════════════════════════════════════
+const WORKER_CODE = `
+const OSRM_TIMEOUT_MS     = 10000;
+const OSRM_RETRY_WAIT_MS  = 1500;
+const OSRM_REQUEST_GAP_MS = 600;
+const OSRM_MAX_ATTEMPTS   = 5;
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function fetchWithTimeout(url, opts={}, ms=OSRM_TIMEOUT_MS){
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(), ms);
+  try{
+    return await fetch(url,{...opts, signal:ctrl.signal});
+  }catch(e){
+    if(e && e.name==='AbortError') throw new Error('Timeout consultando OSRM');
+    throw e;
+  }finally{ clearTimeout(tid); }
+}
+
+function isRetryable(err){
+  const m=String(err&&err.message?err.message:err).toLowerCase();
+  return m.includes('timeout')||m.includes('429')||m.includes('500')||
+         m.includes('502')||m.includes('503')||m.includes('504')||
+         m.includes('failed to fetch')||m.includes('load failed')||
+         m.includes('networkerror')||m.includes('aborterror');
+}
+
+async function withRetry(fn, label='OSRM'){
+  let lastErr;
+  for(let i=0;i<OSRM_MAX_ATTEMPTS;i++){
+    try{ return await fn(); }
+    catch(e){
+      lastErr=e;
+      self.postMessage({type:'warn', msg:\`\${label} intento \${i+1}/\${OSRM_MAX_ATTEMPTS}: \${e.message}\`});
+      if(i===OSRM_MAX_ATTEMPTS-1||!isRetryable(e)) break;
+      await sleep(OSRM_RETRY_WAIT_MS*(i+1));
+    }
+  }
+  throw lastErr;
+}
+
+// ── Hash helpers (para D1) ──────────────────────────────────
+function simpleHash(str){
+  let h=2166136261;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); }
+  return (h>>>0).toString(36);
+}
+function normalizePoint(p){
+  return {id:String(p.idApoyo||p.idTrafo||''), lat:+Number(p.lat).toFixed(7), lon:+Number(p.lon).toFixed(7)};
+}
+function buildRequestHash(grp){
+  const pts=[grp.trafo,...grp.apoyos].map(normalizePoint);
+  return simpleHash(JSON.stringify(pts));
+}
+
+// ── D1 Cache (desde worker usando URL absoluta) ─────────────
+async function d1Get(grp, batchId, apiBase){
+  const hash=buildRequestHash(grp);
+  const qs=new URLSearchParams({batch_id:batchId, id_trafo:String(grp.id), request_hash:hash});
+  qs.set('include_geom','0');
+  const res=await fetchWithTimeout(\`\${apiBase}/route/get?\${qs}\`, {}, 20000);
+  const d=await res.json();
+  if(!d.ok||!d.found) return null;
+  return {walkTime:d.route.walk_time_min, walkOrder:d.route.walk_order};
+}
+
+async function d1Save(grp, batchId, apiBase){
+  const hash=buildRequestHash(grp);
+  await fetchWithTimeout(\`\${apiBase}/route/save\`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      batch_id:batchId, id_trafo:String(grp.id), request_hash:hash,
+      status:'done', walk_geom:null,
+      walk_time_min:grp.walkTime, walk_order:grp.walkOrder,
+      error_message:null
+    })
+  }, 20000);
+}
+
+// ── OSRM Walking ────────────────────────────────────────────
+async function osrmTable(pts){
+  const coords=pts.map(p=>\`\${p.lon},\${p.lat}\`).join(';');
+  return withRetry(async()=>{
+    const res=await fetchWithTimeout(\`https://router.project-osrm.org/table/v1/walking/\${coords}?annotations=duration\`);
+    if(!res.ok) throw new Error(\`walking table HTTP \${res.status}\`);
+    const d=await res.json();
+    if(d.code!=='Ok'||!Array.isArray(d.durations)||!d.durations.length)
+      throw new Error('OSRM walking table inválida: '+(d.message||d.code));
+    return d.durations;
+  }, \`Trafo \${pts[0]&&pts[0].idApoyo} table\`);
+}
+
+async function osrmRoute(pts){
+  const coords=pts.map(p=>\`\${p.lon},\${p.lat}\`).join(';');
+  return withRetry(async()=>{
+    const res=await fetchWithTimeout(\`https://router.project-osrm.org/route/v1/walking/\${coords}?overview=full&geometries=geojson\`);
+    if(!res.ok) throw new Error(\`walking route HTTP \${res.status}\`);
+    const d=await res.json();
+    if(d.code!=='Ok'||!d.routes||!d.routes[0])
+      throw new Error('OSRM walking route inválida: '+(d.message||d.code));
+    return {duration:d.routes[0].duration};
+  }, 'walking route');
+}
+
+// ── TSP NN + 2-opt ──────────────────────────────────────────
+function nnWalk(mat, n){
+  const order=[0], rem=new Set(Array.from({length:n-1},(_,i)=>i+1));
+  while(rem.size>0){
+    const last=order[order.length-1];
+    let best=-1, bd=Infinity;
+    rem.forEach(j=>{ const d=mat[last]?.[j]; if(Number.isFinite(d)&&d<bd){bd=d;best=j;} });
+    if(best<0) throw new Error('Matriz OSRM incompleta');
+    order.push(best); rem.delete(best);
+  }
+  return order;
+}
+
+function twoOptWalk(mat, order){
+  let r=[...order], imp=true;
+  while(imp){
+    imp=false;
+    for(let i=1;i<r.length-1;i++){
+      for(let j=i+1;j<r.length;j++){
+        const a=mat[r[i-1]]?.[r[i]], b=j+1<r.length?mat[r[j]]?.[r[j+1]]:0;
+        const c=mat[r[i-1]]?.[r[j]], d=j+1<r.length?mat[r[i]]?.[r[j+1]]:0;
+        if(!Number.isFinite(a)||!Number.isFinite(b)||!Number.isFinite(c)||!Number.isFinite(d)) continue;
+        if(c+d<a+b-0.01){
+          r=[...r.slice(0,i),...r.slice(i,j+1).reverse(),...r.slice(j+1)];
+          imp=true;
+        }
+      }
+    }
+  }
+  return r;
+}
+
+// ── Procesar un grupo ───────────────────────────────────────
+async function processGroup(grp, batchId, apiBase, force){
+  const pts=[grp.trafo,...grp.apoyos];
+
+  // Solo 1 punto → no hay walking
+  if(pts.length<=1){
+    grp.walkTime=0; grp.walkOrder=pts; grp.fromCache=false; return;
+  }
+
+  // Consultar D1 cache
+  if(!force){
+    try{
+      const cached=await d1Get(grp, batchId, apiBase);
+      if(cached && Array.isArray(cached.walkOrder)){
+        grp.walkTime=cached.walkTime;
+        grp.walkOrder=cached.walkOrder;
+        grp.fromCache=true;
+        return;
+      }
+    }catch(e){
+      self.postMessage({type:'warn', msg:\`D1 get fallido para Trafo \${grp.id}: \${e.message}\`});
+    }
+  }
+
+  // OSRM tabla
+  const mat=await osrmTable(pts);
+
+  // TSP
+  const order=nnWalk(mat, pts.length);
+  const optimized=twoOptWalk(mat, order);
+  grp.walkOrder=optimized.map(i=>pts[i]);
+
+  // OSRM ruta (para obtener tiempo real)
+  const rd=await osrmRoute(grp.walkOrder);
+  grp.walkTime=rd.duration/60;
+  grp.fromCache=false;
+
+  // Guardar en D1
+  try{
+    await d1Save(grp, batchId, apiBase);
+  }catch(e){
+    self.postMessage({type:'warn', msg:\`D1 save fallido para Trafo \${grp.id}: \${e.message}\`});
+  }
+}
+
+// ── Message handler ─────────────────────────────────────────
+self.onmessage=async function(e){
+  const{type, groups, batchId, apiBase, force}=e.data;
+  if(type!=='start') return;
+
+  let done=0, fromCache=0, fromOSRM=0;
+  const total=groups.length;
+
+  for(let i=0;i<total;i++){
+    const grp=groups[i];
+    self.postMessage({type:'progress', done:i, total,
+      msg:\`Trafo \${grp.id} · \${i}/\${total} completados · D1:\${fromCache} · OSRM:\${fromOSRM}\`});
+    try{
+      await processGroup(grp, batchId, apiBase, force);
+      if(grp.fromCache) fromCache++; else fromOSRM++;
+      done++;
+      // Devolver resultado al hilo principal
+      self.postMessage({
+        type:'group_done', grpId:grp.id, grpIdx:i,
+        walkTime:grp.walkTime, walkOrder:grp.walkOrder, fromCache:grp.fromCache
+      });
+    }catch(err){
+      self.postMessage({type:'group_error', grpId:grp.id, grpIdx:i, error:err.message});
+      // Error fatal: parar y notificar
+      self.postMessage({type:'fatal', message:\`Falló Trafo \${grp.id} después de \${OSRM_MAX_ATTEMPTS} intentos: \${err.message}\`});
+      return;
+    }
+    self.postMessage({type:'progress', done:done, total,
+      msg:\`Completado \${done}/\${total} · D1:\${fromCache} · OSRM nuevos:\${fromOSRM}\`});
+    if(i<total-1) await sleep(OSRM_REQUEST_GAP_MS);
+  }
+  self.postMessage({type:'all_done', fromCache, fromOSRM});
+};
+`;
+
+// ══════════════════════════════════════════════════════════════
+//  CONSTANTES
 // ══════════════════════════════════════════════════════════════
 const ROUTE_COLORS = ['#ef4444','#3b82f6','#22c55e','#a855f7'];
 const ROUTE_NAMES  = ['Ruta A','Ruta B','Ruta C','Ruta D'];
 const SUP_LABELS   = ['Supervisor 1','Supervisor 2','Supervisor 3','Supervisor 4'];
-
-// Distinct colors per day (shared across routes)
-const DAY_COLORS = ['#f59e0b','#06b6d4','#84cc16','#ec4899','#8b5cf6','#14b8a6','#f97316','#6366f1','#10b981','#e11d48'];
-
-// Walking speed: 4 km/h = 1 km per 15 min
-const WALK_SPEED_MIN_PER_KM = 15;
+const DAY_COLORS   = ['#f59e0b','#06b6d4','#84cc16','#ec4899','#8b5cf6','#14b8a6','#f97316','#6366f1','#10b981','#e11d48'];
+const OSRM_CACHE_API_BASE = '/api/osrm';
 
 // ══════════════════════════════════════════════════════════════
-//  STATE
+//  ESTADO
 // ══════════════════════════════════════════════════════════════
-let BASE_PT = {lat:15.488029, lon:-87.979872};
-let RAW_ROWS = [];       // parsed CSV rows
-let GROUPS = [];         // [{id, trafo, apoyos, totalClients, inspTime}]
-let numRoutes = 2;
+let BASE_PT={lat:15.488029,lon:-87.979872};
+let RAW_ROWS=[], GROUPS=[];
+let numRoutes=2;
 let gRoutes=[], gSchedules=[], gAllPts=null;
 let gRouteLayers=[], gPreviewMarkers=[];
 let baseMarker=null;
 let forceRecalculateOSRM=false;
-let currentBatchId=null;
-let currentCsvHash=null;
+let currentBatchId=null, currentCsvHash=null;
+let activeWorker=null;
 
 // ══════════════════════════════════════════════════════════════
-//  MAP INIT
+//  MAPA
 // ══════════════════════════════════════════════════════════════
-const map = L.map('map',{zoomControl:false,preferCanvas:true}).setView([15.60,-87.96],11);
+const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([15.60,-87.96],11);
 L.control.zoom({position:'bottomright'}).addTo(map);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© OpenStreetMap',
-  maxZoom:19
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
+baseMarker=L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:2000}).bindPopup('<b>BASE / Depósito</b>').addTo(map);
 
-baseMarker = L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:2000})
-  .bindPopup('<b>BASE / Depósito</b>').addTo(map);
+function mkBaseIcon(){return L.divIcon({html:`<div style="width:32px;height:32px;border-radius:50%;background:#f5a623;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid rgba(255,255,255,.9);box-shadow:0 3px 12px rgba(245,166,35,.5)">▶</div>`,iconSize:[32,32],iconAnchor:[16,16],className:''});}
+function mkTrafoIcon(label,color){const light=needsLightText(color);return L.divIcon({html:`<div style="width:28px;height:28px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;color:${light?'#fff':'#111'};font-size:8px;font-weight:800;border:2.5px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.55);font-family:'IBM Plex Mono',monospace">T${label}</div>`,iconSize:[28,28],iconAnchor:[14,14],className:''});}
+function mkApoyoIcon(color){return L.divIcon({html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.7);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,iconSize:[10,10],iconAnchor:[5,5],className:''});}
+function mkPreviewTrafoIcon(){return L.divIcon({html:`<div style="width:10px;height:10px;border-radius:3px;background:#475569;border:1.5px solid #64748b"></div>`,iconSize:[10,10],iconAnchor:[5,5],className:''});}
 
-function mkBaseIcon(){
-  return L.divIcon({html:`<div style="width:32px;height:32px;border-radius:50%;background:#f5a623;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid rgba(255,255,255,.9);box-shadow:0 3px 12px rgba(245,166,35,.5)">▶</div>`,iconSize:[32,32],iconAnchor:[16,16],className:''});
+// ══════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════
+const fmtKm  = m=>(m/1000).toFixed(1)+' km';
+const fmtT   = s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}h ${m}m`:`${m}m`;};
+const fmtTMin= m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return h>0?`${h}h ${mn}m`:`${mn}m`;};
+const minToT = m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;};
+function needsLightText(hex){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return(r*299+g*587+b*114)/1000<128;}
+function haversineKm(lat1,lon1,lat2,lon2){const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function setProgress(pct,msg){document.getElementById('pbar').style.width=pct+'%';document.getElementById('load-msg').textContent=msg;}
+function showLoading(on){document.getElementById('loading').classList[on?'add':'remove']('show');document.getElementById('calc-btn').disabled=on;document.getElementById('recalc-btn').disabled=on||!GROUPS.length;}
+function setCacheStatus(msg){const el=document.getElementById('cache-status');if(el)el.textContent=msg;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',6000);}
+
+// ══════════════════════════════════════════════════════════════
+//  HASH HELPERS (hilo principal, para batch)
+// ══════════════════════════════════════════════════════════════
+function simpleHash(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(36);}
+function normalizePoint(p){return{id:String(p.idApoyo||p.idTrafo||''),lat:+Number(p.lat).toFixed(7),lon:+Number(p.lon).toFixed(7)};}
+function buildCsvHash(){const payload=GROUPS.map(g=>({id:String(g.id),trafo:normalizePoint(g.trafo),apoyos:g.apoyos.map(normalizePoint),clientes:g.totalClients})).sort((a,b)=>String(a.id).localeCompare(String(b.id)));return simpleHash(JSON.stringify(payload));}
+function prepareServerBatch(){currentCsvHash=buildCsvHash();currentBatchId=`csv_${currentCsvHash}`;return{batch_id:currentBatchId,csv_hash:currentCsvHash};}
+
+// ══════════════════════════════════════════════════════════════
+//  D1 BATCH (hilo principal)
+// ══════════════════════════════════════════════════════════════
+async function fetchJson(url,opts={}){
+  const res=await fetch(url,{...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}});
+  const d=await res.json();
+  if(!res.ok||!d||d.ok===false) throw new Error(d&&d.error?d.error:`API D1 HTTP ${res.status}`);
+  return d;
 }
-function mkTrafoIcon(label, color){
-  const light = needsLightText(color);
-  return L.divIcon({
-    html:`<div style="width:28px;height:28px;border-radius:6px;background:${color};display:flex;align-items:center;justify-content:center;color:${light?'#fff':'#111'};font-size:8px;font-weight:800;border:2.5px solid rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.55);font-family:'IBM Plex Mono',monospace">T${label}</div>`,
-    iconSize:[28,28],iconAnchor:[14,14],className:''
-  });
+async function startServerBatch(){
+  const b=prepareServerBatch();
+  await fetchJson(`${OSRM_CACHE_API_BASE}/batch/start`,{method:'POST',body:JSON.stringify({batch_id:b.batch_id,csv_hash:b.csv_hash,total_groups:GROUPS.length})});
+  setCacheStatus(`Caché D1: lote ${b.batch_id} registrado.`);
+  return b;
 }
-function mkApoyoIcon(color){
-  return L.divIcon({
-    html:`<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.7);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    iconSize:[10,10],iconAnchor:[5,5],className:''
-  });
-}
-function mkPreviewTrafoIcon(){
-  return L.divIcon({html:`<div style="width:10px;height:10px;border-radius:3px;background:#475569;border:1.5px solid #64748b"></div>`,iconSize:[10,10],iconAnchor:[5,5],className:''});
+async function clearOSRMCache(showMsg=true){
+  try{
+    await fetchJson(`${OSRM_CACHE_API_BASE}/batch/clear`,{method:'POST',body:JSON.stringify({batch_id:currentBatchId})});
+    setCacheStatus(`Caché D1: lote limpiado.`);
+    if(showMsg) toast('Caché D1 limpiada para este CSV.');
+  }catch(err){
+    if(showMsg) toast('No se pudo limpiar caché D1: '+err.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  TABS & N-BUTTONS
+//  EVENTS
 // ══════════════════════════════════════════════════════════════
 document.querySelectorAll('.tab-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -430,15 +586,9 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
   });
 });
 document.querySelectorAll('.n-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.n-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    numRoutes=+btn.dataset.n;
-  });
+  btn.addEventListener('click',()=>{document.querySelectorAll('.n-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');numRoutes=+btn.dataset.n;});
 });
-document.getElementById('cfg-lunch').addEventListener('change',e=>{
-  document.getElementById('lunch-fields').classList.toggle('hidden',!e.target.checked);
-});
+document.getElementById('cfg-lunch').addEventListener('change',e=>{document.getElementById('lunch-fields').classList.toggle('hidden',!e.target.checked);});
 document.getElementById('calc-btn').addEventListener('click',()=>{forceRecalculateOSRM=false;calculateAll();});
 document.getElementById('recalc-btn').addEventListener('click',async()=>{
   if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
@@ -448,25 +598,20 @@ document.getElementById('recalc-btn').addEventListener('click',async()=>{
   calculateAll();
 });
 document.getElementById('clear-cache-btn').addEventListener('click',async()=>{
-  if(!GROUPS.length){toast('Cargá un CSV primero para identificar el lote.');return;}
+  if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
   prepareServerBatch();
   await clearOSRMCache(true);
 });
 document.getElementById('export-btn').addEventListener('click',exportCSV);
-
-// Base apply
 document.getElementById('base-apply-btn').addEventListener('click',()=>{
   const lat=parseFloat(document.getElementById('cfg-blat').value);
   const lon=parseFloat(document.getElementById('cfg-blon').value);
   if(isNaN(lat)||isNaN(lon)){toast('Coordenadas inválidas.');return;}
-  BASE_PT={lat,lon};
-  baseMarker.setLatLng([lat,lon]);
-  map.setView([lat,lon],13);
+  BASE_PT={lat,lon};baseMarker.setLatLng([lat,lon]);map.setView([lat,lon],13);
 });
 
 // ══════════════════════════════════════════════════════════════
-//  CSV PARSING — fixed 6-column format
-//  Tipo | ID_APOYO | ID_Transformador | CantidadClientes | Latitud | Longitud
+//  CSV PARSING
 // ══════════════════════════════════════════════════════════════
 function parseCSV(text){
   if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
@@ -474,406 +619,40 @@ function parseCSV(text){
   if(lines.length<2) throw new Error('Archivo vacío o sin datos');
   const sep=lines[0].includes(';')?';':',';
   const rows=[];
-  // Skip header row (line 0)
   for(let i=1;i<lines.length;i++){
     const cols=lines[i].split(sep).map(c=>c.trim().replace(/^"|"$/g,''));
     if(cols.length<6||cols.every(c=>!c)) continue;
     const lat=parseFloat(cols[4].replace(',','.'));
     const lon=parseFloat(cols[5].replace(',','.'));
     if(isNaN(lat)||isNaN(lon)) continue;
-    rows.push({
-      tipo: cols[0].trim().toLowerCase(),        // 'transformador' or 'apoyo'
-      idApoyo: cols[1].trim(),
-      idTrafo: cols[2].trim(),
-      clientes: parseInt(cols[3])||0,
-      lat, lon
-    });
+    rows.push({tipo:cols[0].trim().toLowerCase(),idApoyo:cols[1].trim(),idTrafo:cols[2].trim(),clientes:parseInt(cols[3])||0,lat,lon});
   }
   return rows;
 }
 
 function buildGroups(rows){
-  // Group rows by ID_Transformador
-  const map2={};
+  const m={};
   rows.forEach(r=>{
-    if(!map2[r.idTrafo]) map2[r.idTrafo]={trafo:null,apoyos:[]};
-    if(r.tipo==='transformador'){
-      map2[r.idTrafo].trafo=r;
-    } else {
-      map2[r.idTrafo].apoyos.push(r);
-    }
+    if(!m[r.idTrafo]) m[r.idTrafo]={trafo:null,apoyos:[]};
+    if(r.tipo==='transformador') m[r.idTrafo].trafo=r;
+    else m[r.idTrafo].apoyos.push(r);
   });
-
   const groups=[];
-  Object.keys(map2).forEach(id=>{
-    const g=map2[id];
-    if(!g.trafo){
-      // No transformer row found — skip or use first apoyo as anchor
-      return;
-    }
+  Object.keys(m).forEach(id=>{
+    const g=m[id];
+    if(!g.trafo) return;
     const totalClients=g.trafo.clientes+g.apoyos.reduce((s,a)=>s+a.clientes,0);
-    groups.push({
-      id,
-      trafo: g.trafo,
-      apoyos: g.apoyos,       // additional apoyos (not the trafo apoyo)
-      totalClients,
-      inspTime: 0,             // filled in after config is read
-      walkTime: 0              // walking between apoyos (haversine)
-    });
+    groups.push({id,trafo:g.trafo,apoyos:g.apoyos,totalClients,inspTime:0,walkTime:0,walkOrder:[],totalTime:0});
   });
   return groups;
 }
 
-function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
+function computeGroupTimes(groups,inspTrafoMin,inspClientMin){
   groups.forEach(g=>{
-    g.inspTime = inspTrafoMin
-      + g.trafo.clientes * inspClientMin
-      + g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0);
-    // walkTime and walkGeom set later by computeAllGroupWalking using OSRM
-    g.walkTime = 0;
-    g.walkGeom = null;
-    g.walkOrder = [g.trafo,...g.apoyos]; // default order
-    g.totalTime = g.inspTime;
+    g.inspTime=inspTrafoMin+g.trafo.clientes*inspClientMin+g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0);
+    g.walkTime=0; g.walkOrder=[g.trafo,...g.apoyos]; g.totalTime=g.inspTime;
   });
 }
-
-// ── OSRM helpers ──────────────────────────────────────────────
-// The public OSRM demo server has usage limits and may hang/timeout.
-// Keep calls controlled: timeout every fetch, retry failures, and avoid parallel walking requests.
-
-// ══════════════════════════════════════════════════════════════
-//  SERVER OSRM CACHE — Cloudflare Pages Functions + D1
-//  Guarda geometrías OSRM por transformador en D1 para poder reanudar.
-// ══════════════════════════════════════════════════════════════
-const OSRM_CACHE_API_BASE = '/api/osrm';
-const OSRM_PARALLEL_GROUPS = 1;
-
-function setCacheStatus(msg){
-  const el=document.getElementById('cache-status');
-  if(el) el.textContent=msg;
-}
-
-function simpleHash(str){
-  let h=2166136261;
-  for(let i=0;i<str.length;i++){
-    h^=str.charCodeAt(i);
-    h=Math.imul(h,16777619);
-  }
-  return (h>>>0).toString(36);
-}
-
-function normalizePointForHash(p){
-  return {
-    id:String(p.idApoyo||p.idTrafo||''),
-    lat:+Number(p.lat).toFixed(7),
-    lon:+Number(p.lon).toFixed(7)
-  };
-}
-
-function buildCsvHash(){
-  const payload=GROUPS.map(g=>({
-    id:String(g.id),
-    trafo:normalizePointForHash(g.trafo),
-    apoyos:g.apoyos.map(normalizePointForHash),
-    clientes:g.totalClients
-  })).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
-  return simpleHash(JSON.stringify(payload));
-}
-
-function prepareServerBatch(){
-  currentCsvHash=buildCsvHash();
-  currentBatchId=`csv_${currentCsvHash}`;
-  return {batch_id:currentBatchId,csv_hash:currentCsvHash};
-}
-
-function buildWalkingRequestHash(grp){
-  const pts=[grp.trafo,...grp.apoyos].map(normalizePointForHash);
-  return simpleHash(JSON.stringify(pts));
-}
-
-async function apiJson(url, options={}){
-  const res=await fetchWithTimeout(url,{
-    ...options,
-    headers:{
-      'Content-Type':'application/json',
-      ...(options.headers||{})
-    }
-  },20000);
-  let data=null;
-  try{ data=await res.json(); }catch(_){ data=null; }
-  if(!res.ok || !data || data.ok===false){
-    throw new Error((data && data.error) ? data.error : `API D1 HTTP ${res.status}`);
-  }
-  return data;
-}
-
-async function startServerBatch(){
-  const b=prepareServerBatch();
-  await apiJson(`${OSRM_CACHE_API_BASE}/batch/start`,{
-    method:'POST',
-    body:JSON.stringify({
-      batch_id:b.batch_id,
-      csv_hash:b.csv_hash,
-      total_groups:GROUPS.length
-    })
-  });
-  setCacheStatus(`Caché OSRM D1: lote ${b.batch_id} registrado.`);
-  return b;
-}
-
-async function getCachedWalkingRoute(grp){
-  if(!currentBatchId) prepareServerBatch();
-  const requestHash=buildWalkingRequestHash(grp);
-  const qs=new URLSearchParams({
-    batch_id:currentBatchId,
-    id_trafo:String(grp.id),
-    request_hash:requestHash
-  });
-  qs.set('include_geom','0');
-  const data=await apiJson(`${OSRM_CACHE_API_BASE}/route/get?${qs.toString()}`,{method:'GET'});
-  if(!data.found) return null;
-  return {
-    walkTime:data.route.walk_time_min,
-    // Importante: no traer walk_geom durante la validación/reanudación.
-    // La geometría completa queda en D1 y solo se carga si se necesita dibujarla.
-    walkGeom:null,
-    walkOrder:data.route.walk_order,
-    requestHash
-  };
-}
-
-async function setCachedWalkingRoute(grp){
-  if(!currentBatchId) prepareServerBatch();
-  const requestHash=buildWalkingRequestHash(grp);
-  await apiJson(`${OSRM_CACHE_API_BASE}/route/save`,{
-    method:'POST',
-    body:JSON.stringify({
-      batch_id:currentBatchId,
-      id_trafo:String(grp.id),
-      request_hash:requestHash,
-      status:'done',
-      walk_geom:grp.walkGeom,
-      walk_time_min:grp.walkTime,
-      walk_order:grp.walkOrder,
-      error_message:null
-    })
-  });
-}
-
-async function clearOSRMCache(showMsg=true){
-  try{
-    if(!currentBatchId) prepareServerBatch();
-    await apiJson(`${OSRM_CACHE_API_BASE}/batch/clear`,{
-      method:'POST',
-      body:JSON.stringify({batch_id:currentBatchId})
-    });
-    setCacheStatus(`Caché OSRM D1: lote ${currentBatchId} limpiado.`);
-    if(showMsg) toast('Caché OSRM D1 limpiado para este CSV.');
-  }catch(err){
-    console.error(err);
-    if(showMsg) toast('No se pudo limpiar caché D1: '+err.message);
-  }
-}
-
-function applyCachedWalkingRoute(grp,cached){
-  grp.walkFallback=false;
-  grp.walkFallbackReason='';
-  grp.walkTime=cached.walkTime;
-  grp.walkGeom=null; // no cargar GeoJSON completo en memoria al reanudar desde D1
-  grp.walkOrder=cached.walkOrder;
-  grp.totalTime=grp.inspTime+grp.walkTime;
-  grp.osrmCached=true;
-}
-
-const OSRM_TIMEOUT_MS = 15000;
-const OSRM_RETRY_WAIT_MS = 2500;
-const OSRM_REQUEST_GAP_MS = 900;
-const OSRM_MAX_ATTEMPTS = 8;
-
-function sleep(ms){
-  return new Promise(resolve=>setTimeout(resolve,ms));
-}
-
-// Compatibilidad: si alguna ruta vieja todavía llama withTimeout(fetch(...)),
-// no vuelve a aparecer ReferenceError.
-function withTimeout(promise, timeoutMs=OSRM_TIMEOUT_MS){
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject)=>{
-    timeoutId = setTimeout(()=>reject(new Error('Timeout consultando OSRM')), timeoutMs);
-  });
-  return Promise.race([promise, timeoutPromise]).finally(()=>clearTimeout(timeoutId));
-}
-
-async function fetchWithTimeout(url, options={}, timeoutMs=OSRM_TIMEOUT_MS){
-  const controller = new AbortController();
-  const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
-
-  try{
-    return await fetch(url,{
-      ...options,
-      signal: controller.signal
-    });
-  }catch(err){
-    if(err && err.name === 'AbortError'){
-      throw new Error('Timeout consultando OSRM');
-    }
-    throw err;
-  }finally{
-    clearTimeout(timeoutId);
-  }
-}
-
-function isRetryableOSRMError(err){
-  const msg=String(err && err.message ? err.message : err).toLowerCase();
-  return msg.includes('timeout') || msg.includes('http 429') || msg.includes('http 500') ||
-         msg.includes('http 502') || msg.includes('http 503') || msg.includes('http 504') ||
-         msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed');
-}
-
-// Retry estricto: no usa Haversine como fallback. Si OSRM no responde, reintenta
-// con espera progresiva; al agotar intentos detiene el cálculo con error claro.
-async function withRetry(fn, attempts=OSRM_MAX_ATTEMPTS, waitMs=OSRM_RETRY_WAIT_MS, label='OSRM'){
-  let lastErr;
-  for(let i=0;i<attempts;i++){
-    try{
-      return await fn(i+1);
-    }catch(e){
-      lastErr=e;
-      const retryable=isRetryableOSRMError(e);
-      console.warn(`${label} intento ${i+1}/${attempts} falló:`, e);
-      if(i===attempts-1 || !retryable) break;
-      const backoff=waitMs*(i+1);
-      await sleep(backoff);
-    }
-  }
-  throw lastErr;
-}
-
-async function osrmWalkingTable(pts, progressLabel=''){
-  const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  return withRetry(async()=>{
-    const res=await fetchWithTimeout(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`);
-    if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
-    const d=await res.json();
-    if(d.code!=='Ok') throw new Error('OSRM walking: '+(d.message||d.code));
-    if(!Array.isArray(d.durations) || !d.durations.length) throw new Error('OSRM walking table vacía');
-    return d.durations;
-  }, OSRM_MAX_ATTEMPTS, OSRM_RETRY_WAIT_MS, progressLabel || 'OSRM walking table');
-}
-
-async function osrmWalkingRoute(pts, progressLabel=''){
-  const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  return withRetry(async()=>{
-    const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`);
-    if(!res.ok) throw new Error(`walking route HTTP ${res.status}`);
-    const d=await res.json();
-    if(d.code!=='Ok') throw new Error('OSRM walking route: '+(d.message||d.code));
-    if(!d.routes || !d.routes[0]) throw new Error('OSRM walking route sin rutas');
-    return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
-  }, OSRM_MAX_ATTEMPTS, OSRM_RETRY_WAIT_MS, progressLabel || 'OSRM walking route');
-}
-
-async function computeGroupWalking(grp){
-  const pts=[grp.trafo,...grp.apoyos];
-  grp.walkFallback=false;
-  grp.walkFallbackReason='';
-  grp.osrmCached=false;
-
-  if(pts.length<=1){
-    grp.walkTime=0; grp.walkGeom=null; grp.walkOrder=pts;
-    grp.totalTime=grp.inspTime; return;
-  }
-
-  const label=`Trafo ${grp.id}`;
-  if(!forceRecalculateOSRM){
-    try{
-      const cached=await getCachedWalkingRoute(grp);
-      if(cached && Array.isArray(cached.walkOrder)){
-        applyCachedWalkingRoute(grp,cached);
-        return;
-      }
-    }catch(cacheErr){
-      console.warn('No se pudo leer caché OSRM D1:', cacheErr);
-      setCacheStatus('Caché OSRM D1: no disponible, calculando directo.');
-    }
-  }
-
-  const mat=await osrmWalkingTable(pts, `${label} · tabla walking`);
-
-  const order=[0];
-  const rem=new Set(pts.map((_,i)=>i).slice(1));
-  while(rem.size>0){
-    const last=order[order.length-1];
-    let best=-1,bd=Infinity;
-    rem.forEach(j=>{
-      const d=mat[last]?.[j];
-      if(Number.isFinite(d) && d<bd){bd=d;best=j;}
-    });
-    if(best<0) throw new Error(`OSRM devolvió matriz incompleta para ${label}`);
-    order.push(best); rem.delete(best);
-  }
-
-  let imp=true;
-  while(imp){
-    imp=false;
-    for(let i=1;i<order.length-1;i++){
-      for(let j=i+1;j<order.length;j++){
-        const a=mat[order[i-1]]?.[order[i]];
-        const b=j+1<order.length?mat[order[j]]?.[order[j+1]]:0;
-        const c=mat[order[i-1]]?.[order[j]];
-        const d=j+1<order.length?mat[order[i]]?.[order[j+1]]:0;
-        if(!Number.isFinite(a)||!Number.isFinite(b)||!Number.isFinite(c)||!Number.isFinite(d)) continue;
-        if(c+d<a+b-0.01){
-          order.splice(i,j-i+1,...order.slice(i,j+1).reverse());
-          imp=true;
-        }
-      }
-    }
-  }
-
-  grp.walkOrder=order.map(i=>pts[i]);
-
-  const rd=await osrmWalkingRoute(grp.walkOrder, `${label} · ruta walking`);
-  grp.walkTime=rd.duration/60;
-  grp.walkGeom=rd.geom;
-  grp.totalTime=grp.inspTime+grp.walkTime;
-
-  try{
-    await setCachedWalkingRoute(grp);
-    // Liberar la geometría completa después de guardarla en D1.
-    // Evita que muchas rutas GeoJSON queden acumuladas en memoria del navegador.
-    grp.walkGeom=null;
-    setCacheStatus(`Caché OSRM D1: guardado Trafo ${grp.id}.`);
-  }catch(cacheErr){
-    console.warn('No se pudo guardar caché OSRM D1:', cacheErr);
-    setCacheStatus('Caché OSRM D1: no se pudo guardar, cálculo continúa.');
-  }
-}
-
-async function computeAllGroupWalking(groups, onProgress){
-  const total=groups.length;
-  let done=0;
-  let fromCache=0;
-  let fromOSRM=0;
-
-  // Modo conservador: 1 transformador por vez.
-  // Evita Promise.all para que una llamada lenta a OSRM no deje un lote completo bloqueado
-  // y reduce la presión sobre el navegador y sobre router.project-osrm.org.
-  for(let i=0;i<groups.length;i++){
-    const grp=groups[i];
-    onProgress(done,total,`Procesando Trafo ${grp.id} · ${done}/${total} completados...`);
-
-    await computeGroupWalking(grp);
-
-    if(grp.osrmCached) fromCache++; else fromOSRM++;
-    done++;
-    onProgress(done,total,`Completado ${done}/${total} · D1: ${fromCache} · OSRM nuevos: ${fromOSRM}`);
-
-    // Pausa corta entre transformadores nuevos/consultados para no presionar el OSRM público.
-    if(i<groups.length-1) await sleep(OSRM_REQUEST_GAP_MS);
-  }
-}
-
 
 // ── File upload ───────────────────────────────────────────────
 const csvInput=document.getElementById('csv-input');
@@ -885,111 +664,69 @@ csvDrop.addEventListener('drop',e=>{e.preventDefault();csvDrop.classList.remove(
 document.getElementById('csv-clear').addEventListener('click',clearCSV);
 
 function handleFile(file){
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      RAW_ROWS=parseCSV(ev.target.result);
-      GROUPS=buildGroups(RAW_ROWS);
-      if(!GROUPS.length){toast('No se encontraron grupos válidos.\nVerificá que el CSV tenga filas con Tipo=Transformador.');return;}
-      showLoadedState(file.name);
-      previewGroups();
-    }catch(err){toast('Error leyendo archivo: '+err.message);}
+  const tryParse=(text)=>{
+    RAW_ROWS=parseCSV(text);
+    GROUPS=buildGroups(RAW_ROWS);
+    if(!GROUPS.length) throw new Error('No se encontraron grupos válidos. Verificá que el CSV tenga filas con Tipo=Transformador.');
+    showLoadedState(file.name);
+    previewGroups();
   };
-  reader.onerror=()=>{
+  const r=new FileReader();
+  r.onload=ev=>{try{tryParse(ev.target.result);}catch(err){
     const r2=new FileReader();
-    r2.onload=ev=>{
-      try{
-        RAW_ROWS=parseCSV(ev.target.result);
-        GROUPS=buildGroups(RAW_ROWS);
-        if(!GROUPS.length){toast('No se encontraron grupos válidos.');return;}
-        showLoadedState(file.name);
-        previewGroups();
-      }catch(err){toast('Error: '+err.message);}
-    };
+    r2.onload=ev2=>{try{tryParse(ev2.target.result);}catch(err2){toast('Error: '+err2.message);}};
     r2.readAsText(file,'ISO-8859-1');
-  };
-  reader.readAsText(file,'UTF-8');
+  }};
+  r.readAsText(file,'UTF-8');
 }
 
 function showLoadedState(fname){
-  const totalClients=GROUPS.reduce((s,g)=>s+g.totalClients,0);
+  const total=GROUPS.reduce((s,g)=>s+g.totalClients,0);
   csvDrop.style.display='none';
   document.getElementById('csv-loaded').classList.add('show');
   document.getElementById('csv-fname').textContent=fname;
-  document.getElementById('csv-fcount').textContent=`${GROUPS.length} transformadores · ${RAW_ROWS.length} registros · ${totalClients} clientes`;
-  document.getElementById('hdr-sub').textContent=`${GROUPS.length} transformadores · ${totalClients} clientes totales`;
+  document.getElementById('csv-fcount').textContent=`${GROUPS.length} transformadores · ${RAW_ROWS.length} registros · ${total} clientes`;
+  document.getElementById('hdr-sub').textContent=`${GROUPS.length} transformadores · ${total} clientes totales`;
   const btn=document.getElementById('calc-btn');
-  btn.disabled=false;
-  btn.innerHTML='⚡ Calcular Rutas y Cronograma';
+  btn.disabled=false; btn.innerHTML='⚡ Calcular Rutas y Cronograma';
   document.getElementById('recalc-btn').disabled=false;
 }
 
 function clearCSV(){
-  RAW_ROWS=[]; GROUPS=[];
+  RAW_ROWS=[];GROUPS=[];
   csvDrop.style.display='block';
   document.getElementById('csv-loaded').classList.remove('show');
   csvInput.value='';
   document.getElementById('hdr-sub').textContent='Cargá un CSV para comenzar · OSRM + OpenStreetMap';
   const btn=document.getElementById('calc-btn');
-  btn.disabled=true;
-  btn.innerHTML='📂 Cargá un CSV para calcular';
+  btn.disabled=true; btn.innerHTML='📂 Cargá un CSV para calcular';
   document.getElementById('recalc-btn').disabled=true;
-  gPreviewMarkers.forEach(m=>map.removeLayer(m));
-  gPreviewMarkers=[];
+  gPreviewMarkers.forEach(m=>map.removeLayer(m)); gPreviewMarkers=[];
 }
 
 function previewGroups(){
-  gPreviewMarkers.forEach(m=>map.removeLayer(m));
-  gPreviewMarkers=[];
+  gPreviewMarkers.forEach(m=>map.removeLayer(m)); gPreviewMarkers=[];
   GROUPS.forEach(g=>{
     const m=L.marker([g.trafo.lat,g.trafo.lon],{icon:mkPreviewTrafoIcon()})
       .bindPopup(`<b>Trafo ${g.id}</b><br><span style="color:#94a3b8">${g.apoyos.length+1} apoyos · ${g.totalClients} clientes</span>`)
       .addTo(map);
     gPreviewMarkers.push(m);
   });
-  if(GROUPS.length){
-    const bounds=[...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]];
-    map.fitBounds(bounds,{padding:[40,40]});
-  }
+  if(GROUPS.length) map.fitBounds([...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]],{padding:[40,40]});
 }
 
 // ══════════════════════════════════════════════════════════════
-//  HELPERS
-// ══════════════════════════════════════════════════════════════
-const fmtKm  = m=>(m/1000).toFixed(1)+' km';
-const fmtT   = s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}h ${m}m`:`${m}m`;};
-const fmtTMin= m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return h>0?`${h}h ${mn}m`:`${mn}m`;};
-const minToT = m=>{const h=Math.floor(m/60),mn=Math.round(m%60);return `${String(h).padStart(2,'0')}:${String(mn).padStart(2,'0')}`;};
-
-function needsLightText(hex){
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return(r*299+g*587+b*114)/1000<128;
-}
-function haversineKm(lat1,lon1,lat2,lon2){
-  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-function setProgress(pct,msg){document.getElementById('pbar').style.width=pct+'%';document.getElementById('load-msg').textContent=msg;}
-function showLoading(on){
-  document.getElementById('loading').classList[on?'add':'remove']('show');
-  document.getElementById('calc-btn').disabled=on;
-  document.getElementById('recalc-btn').disabled=on || !GROUPS.length;
-}
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',5000);}
-
-// ══════════════════════════════════════════════════════════════
-//  CONFIG BUILDER
+//  CONFIG
 // ══════════════════════════════════════════════════════════════
 function getConfig(){
-  const [wsh,wsm]=document.getElementById('cfg-wstart').value.split(':').map(Number);
-  const [weh,wem]=document.getElementById('cfg-wend').value.split(':').map(Number);
+  const[wsh,wsm]=document.getElementById('cfg-wstart').value.split(':').map(Number);
+  const[weh,wem]=document.getElementById('cfg-wend').value.split(':').map(Number);
   const workStart=wsh*60+wsm, workEnd=weh*60+wem;
   const inspTrafoMin=parseFloat(document.getElementById('cfg-trafo-min').value)||2;
   const inspClientMin=parseFloat(document.getElementById('cfg-client-min').value)||2.5;
   const trafficFactor=parseFloat(document.getElementById('cfg-traffic').value)||1.8;
   const lunchEnabled=document.getElementById('cfg-lunch').checked;
-  const [lsh,lsm]=document.getElementById('cfg-lstart').value.split(':').map(Number);
+  const[lsh,lsm]=document.getElementById('cfg-lstart').value.split(':').map(Number);
   const lunchStart=lsh*60+lsm;
   const lunchDur=parseInt(document.getElementById('cfg-ldur').value)||60;
   const noWeekend=document.getElementById('cfg-noweekend').checked;
@@ -997,24 +734,19 @@ function getConfig(){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  WORKING DAYS GENERATOR — starts today, generates forward
+//  WORKING DAYS
 // ══════════════════════════════════════════════════════════════
-function getWorkingDay(dayOffset, noWeekend){
-  const DAY_NAMES=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const MONTH_NAMES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const today=new Date();
-  today.setHours(12,0,0,0);
+function getWorkingDay(dayOffset,noWeekend){
+  const DN=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MN=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const today=new Date(); today.setHours(12,0,0,0);
   let count=0, cur=new Date(today);
   while(true){
     const dow=cur.getDay();
-    const skip=noWeekend&&(dow===0||dow===6);
-    if(!skip){
+    if(!noWeekend||(dow!==0&&dow!==6)){
       if(count===dayOffset){
         const y=cur.getFullYear(),mo=cur.getMonth(),d=cur.getDate();
-        return{
-          date:`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,
-          label:`${DAY_NAMES[dow]}, ${d} de ${MONTH_NAMES[mo]} ${y}`
-        };
+        return{date:`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,label:`${DN[dow]}, ${d} de ${MN[mo]} ${y}`};
       }
       count++;
     }
@@ -1023,7 +755,7 @@ function getWorkingDay(dayOffset, noWeekend){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  K-MEANS (k-means++)
+//  K-MEANS + TSP (hilo principal, rápidos — matrices pequeñas)
 // ══════════════════════════════════════════════════════════════
 function kMeans(pts,k,runs=30){
   if(k>=pts.length) return pts.map((_,i)=>i%k);
@@ -1043,10 +775,7 @@ function kMeans(pts,k,runs=30){
       const na=pts.map(p=>{let b=0,bd=Infinity;cents.forEach((c,i)=>{const d=(p.lat-c.lat)**2+(p.lon-c.lon)**2;if(d<bd){bd=d;b=i;}});return b;});
       if(!na.some((a,i)=>a!==asgn[i])) break;
       asgn=na;
-      for(let i=0;i<k;i++){
-        const cl=pts.filter((_,j)=>asgn[j]===i);
-        if(cl.length)cents[i]={lat:cl.reduce((s,p)=>s+p.lat,0)/cl.length,lon:cl.reduce((s,p)=>s+p.lon,0)/cl.length};
-      }
+      for(let i=0;i<k;i++){const cl=pts.filter((_,j)=>asgn[j]===i);if(cl.length)cents[i]={lat:cl.reduce((s,p)=>s+p.lat,0)/cl.length,lon:cl.reduce((s,p)=>s+p.lon,0)/cl.length};}
     }
     const szs=Array.from({length:k},(_,i)=>asgn.filter(a=>a===i).length);
     const sc=Math.max(...szs)-Math.min(...szs);
@@ -1054,48 +783,55 @@ function kMeans(pts,k,runs=30){
   }
   return best;
 }
+function nnTSP(mat,clIdx){const route=[0],rem=new Set(clIdx);while(rem.size>0){const last=route[route.length-1];let best=-1,bd=Infinity;rem.forEach(i=>{const d=mat[last][i];if(d<bd){bd=d;best=i;}});route.push(best);rem.delete(best);}route.push(0);return route;}
+function twoOpt(mat,route){let r=[...route],imp=true;while(imp){imp=false;for(let i=1;i<r.length-2;i++){for(let j=i+1;j<r.length-1;j++){if(mat[r[i-1]][r[j]]+mat[r[i]][r[j+1]]<mat[r[i-1]][r[i]]+mat[r[j]][r[j+1]]-0.01){r=[...r.slice(0,i),...r.slice(i,j+1).reverse(),...r.slice(j+1)];imp=true;}}}}return r;}
 
-// ══════════════════════════════════════════════════════════════
-//  NEAREST NEIGHBOR + 2-OPT (on group indices)
-// ══════════════════════════════════════════════════════════════
-function nnTSP(mat,clIdx){
-  const route=[0],rem=new Set(clIdx);
-  while(rem.size>0){
-    const last=route[route.length-1];
-    let best=-1,bd=Infinity;
-    rem.forEach(i=>{const d=mat[last][i];if(d<bd){bd=d;best=i;}});
-    route.push(best);rem.delete(best);
-  }
-  route.push(0);return route;
-}
-function twoOpt(mat,route){
-  let r=[...route],imp=true;
-  while(imp){
-    imp=false;
-    for(let i=1;i<r.length-2;i++){
-      for(let j=i+1;j<r.length-1;j++){
-        if(mat[r[i-1]][r[j]]+mat[r[i]][r[j+1]]<mat[r[i-1]][r[i]]+mat[r[j]][r[j+1]]-0.01){
-          r=[...r.slice(0,i),...r.slice(i,j+1).reverse(),...r.slice(j+1)];imp=true;
-        }
-      }
-    }
-  }
-  return r;
+function buildHaversineMatrix(pts,tf){
+  const RF=1.35,SPD=40,n=pts.length;
+  return Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>{
+    if(i===j) return 0;
+    return haversineKm(pts[i].lat,pts[i].lon,pts[j].lat,pts[j].lon)*RF/SPD*3600*tf;
+  }));
 }
 
 // ══════════════════════════════════════════════════════════════
-//  SCHEDULER — group-level stops
+//  OSRM DRIVING (hilo principal — pocas llamadas, no bloquea)
 // ══════════════════════════════════════════════════════════════
-function buildSchedule(groupIndices, scaledDur, cfg){
-  // groupIndices: indices into allPts (0=BASE, 1..n=groups)
-  const {workStart,workEnd,lunchEnabled,lunchStart,lunchDur,noWeekend}=cfg;
+async function osrmDriving(pts){
+  const call=async(chunk)=>{
+    const coords=chunk.map(p=>`${p.lon},${p.lat}`).join(';');
+    const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    if(!res.ok) throw new Error(`driving HTTP ${res.status}`);
+    const d=await res.json();
+    if(d.code!=='Ok') throw new Error('OSRM driving: '+d.message);
+    return d.routes[0];
+  };
+  if(pts.length<=25) return call(pts).then(r=>({geom:r.geometry,distance:r.distance,duration:r.duration}));
+  const CHUNK=24;
+  let totalDist=0,totalDur=0;
+  const allCoords=[];
+  for(let i=0;i<pts.length-1;i+=CHUNK){
+    const chunk=pts.slice(i,Math.min(i+CHUNK+1,pts.length));
+    const rd=await call(chunk);
+    totalDist+=rd.distance; totalDur+=rd.duration;
+    rd.geometry.coordinates.forEach(c=>{
+      if(!allCoords.length||JSON.stringify(allCoords[allCoords.length-1])!==JSON.stringify(c)) allCoords.push(c);
+    });
+  }
+  return{geom:{type:'LineString',coordinates:allCoords},distance:totalDist,duration:totalDur};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SCHEDULER
+// ══════════════════════════════════════════════════════════════
+function buildSchedule(groupIndices,scaledDur,cfg){
+  const{workStart,workEnd,lunchEnabled,lunchStart,lunchDur,noWeekend}=cfg;
   const entries=[];
-  let dayIdx=0, curTime=workStart, prevIdx=0, lunchUsedToday=false;
+  let dayIdx=0,curTime=workStart,prevIdx=0,lunchUsedToday=false;
 
   const checkLunch=(arrMin)=>{
-    if(!lunchEnabled||lunchUsedToday) return {arrMin,lunchApplied:false};
-    // Arrive during lunch
-    if(arrMin>=lunchStart && arrMin<lunchStart+lunchDur){
+    if(!lunchEnabled||lunchUsedToday) return{arrMin,lunchApplied:false};
+    if(arrMin>=lunchStart&&arrMin<lunchStart+lunchDur){
       lunchUsedToday=true;
       return{arrMin:arrMin+lunchDur,lunchApplied:true,lunchBefore:true,lunchBreakStart:arrMin,lunchBreakEnd:arrMin+lunchDur};
     }
@@ -1103,27 +839,20 @@ function buildSchedule(groupIndices, scaledDur, cfg){
   };
 
   for(let si=0;si<groupIndices.length;si++){
-    const grpPtIdx=groupIndices[si]; // index in allPts
-    const grpIdx=grpPtIdx-1;         // index in GROUPS array
+    const grpPtIdx=groupIndices[si];
+    const grpIdx=grpPtIdx-1;
     const grp=GROUPS[grpIdx];
     const travelMin=(scaledDur[prevIdx][grpPtIdx]||0)/60;
-
     let arrMin=curTime+travelMin;
-    let lunchApplied=false,lunchBefore=false,lunchBreakStart=null,lunchBreakEnd=null;
-    let effectiveDep;
+    let lunchApplied=false,lunchBefore=false,lunchBreakStart=null,lunchBreakEnd=null,effectiveDep;
 
-    // Lunch before inspection
     const lc=checkLunch(arrMin);
     arrMin=lc.arrMin;
     if(lc.lunchApplied){lunchApplied=true;lunchBefore=true;lunchBreakStart=lc.lunchBreakStart;lunchBreakEnd=lc.lunchBreakEnd;}
 
     const retMin=(scaledDur[grpPtIdx][0]||0)/60;
-
-    // Day overflow — solo verifica que la inspección quepa, el regreso puede pasarse
     if(arrMin+grp.totalTime>workEnd||arrMin>=workEnd){
-      dayIdx++;
-      lunchUsedToday=false;
-      curTime=workStart; prevIdx=0;
+      dayIdx++;lunchUsedToday=false;curTime=workStart;prevIdx=0;
       arrMin=curTime+(scaledDur[0][grpPtIdx]||0)/60;
       lunchApplied=false;lunchBefore=false;lunchBreakStart=null;lunchBreakEnd=null;
       const lc2=checkLunch(arrMin);
@@ -1132,85 +861,97 @@ function buildSchedule(groupIndices, scaledDur, cfg){
     }
 
     const depMin=arrMin+grp.totalTime;
-
-    // Lunch after inspection
     if(lunchEnabled&&!lunchUsedToday&&depMin>lunchStart){
-      lunchApplied=true;lunchBefore=false;
-      lunchBreakStart=depMin;lunchBreakEnd=depMin+lunchDur;
-      lunchUsedToday=true;
-      effectiveDep=depMin+lunchDur;
-      curTime=effectiveDep;
-    } else {
-      effectiveDep=depMin;
-      curTime=depMin;
-    }
+      lunchApplied=true;lunchBefore=false;lunchBreakStart=depMin;lunchBreakEnd=depMin+lunchDur;
+      lunchUsedToday=true;effectiveDep=depMin+lunchDur;curTime=effectiveDep;
+    } else {effectiveDep=depMin;curTime=depMin;}
 
     const wd=getWorkingDay(dayIdx,noWeekend);
-    entries.push({
-      dayIdx, date:wd.date, dateLabel:wd.label,
-      grpPtIdx, grpIdx, arrMin, depMin, effectiveDep, retMin,
-      travelMin, overflow:false,
-      lunchApplied,lunchBefore,lunchBreakStart,lunchBreakEnd
-    });
+    entries.push({dayIdx,date:wd.date,dateLabel:wd.label,grpPtIdx,grpIdx,arrMin,depMin,effectiveDep,retMin,travelMin,overflow:false,lunchApplied,lunchBefore,lunchBreakStart,lunchBreakEnd});
     prevIdx=grpPtIdx;
   }
   return entries;
 }
 
 // ══════════════════════════════════════════════════════════════
-//  OSRM — route geometry only
-async function osrmRoute(pts){
-  if(pts.length<=25){
-    const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-    return withRetry(async()=>{
-      const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-      if(!res.ok) throw new Error(`driving route HTTP ${res.status}`);
-      const d=await res.json();
-      if(d.code!=='Ok') throw new Error('OSRM driving: '+d.message);
-      return{geom:d.routes[0].geometry,distance:d.routes[0].distance,duration:d.routes[0].duration};
-    });
-  }
-  // For longer routes, chunk and merge
-  const CHUNK=24;
-  let totalDist=0,totalDur=0;
-  const allCoords=[];
-  for(let i=0;i<pts.length-1;i+=CHUNK){
-    const chunk=pts.slice(i,Math.min(i+CHUNK+1,pts.length));
-    const coords=chunk.map(p=>`${p.lon},${p.lat}`).join(';');
-    const rd=await withRetry(async()=>{
-      const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-      if(!res.ok) throw new Error(`driving chunk HTTP ${res.status}`);
-      const d=await res.json();
-      if(d.code!=='Ok') throw new Error('OSRM driving chunk: '+d.message);
-      return d.routes[0];
-    });
-    totalDist+=rd.distance; totalDur+=rd.duration;
-    rd.geometry.coordinates.forEach(c=>{
-      if(!allCoords.length||JSON.stringify(allCoords[allCoords.length-1])!==JSON.stringify(c))
-        allCoords.push(c);
-    });
-  }
-  return{geom:{type:'LineString',coordinates:allCoords},distance:totalDist,duration:totalDur};
+//  WEB WORKER — lanzar y manejar mensajes
+// ══════════════════════════════════════════════════════════════
+function createWorker(){
+  const blob=new Blob([WORKER_CODE],{type:'application/javascript'});
+  const url=URL.createObjectURL(blob);
+  const worker=new Worker(url);
+  URL.revokeObjectURL(url);
+  return worker;
 }
 
-// ── Haversine-based driving matrix (no API limit) ─────────────
-// Uses straight-line distance × road factor (1.35) × traffic factor
-// Good enough for TSP ordering; OSRM used only for geometry display
-function buildHaversineMatrix(pts, trafficFactor){
-  const ROAD_FACTOR=1.35; // road distance ≈ 1.35× straight line
-  const AVG_SPEED_KMH=40; // average urban driving speed (km/h)
-  const n=pts.length;
-  // Returns durations in seconds (to match OSRM table format)
-  const mat=Array.from({length:n},(_,i)=>
-    Array.from({length:n},(_,j)=>{
-      if(i===j) return 0;
-      const km=haversineKm(pts[i].lat,pts[i].lon,pts[j].lat,pts[j].lon);
-      const roadKm=km*ROAD_FACTOR;
-      const hours=roadKm/AVG_SPEED_KMH;
-      return hours*3600*trafficFactor; // seconds, traffic already applied
-    })
-  );
-  return mat;
+function runOSRMWorker(groups, batchId, force){
+  return new Promise((resolve, reject)=>{
+    if(activeWorker){activeWorker.terminate();activeWorker=null;}
+    activeWorker=createWorker();
+    const apiBase=window.location.origin+OSRM_CACHE_API_BASE;
+
+    activeWorker.onmessage=function(e){
+      const msg=e.data;
+      if(msg.type==='progress'){
+        const pct=15+Math.round((msg.done/msg.total)*22);
+        setProgress(pct, msg.msg);
+        setCacheStatus(msg.msg);
+      }
+      else if(msg.type==='group_done'){
+        // Aplicar resultado al grupo en memoria
+        const grp=groups[msg.grpIdx];
+        grp.walkTime=msg.walkTime;
+        grp.walkOrder=msg.walkOrder;
+        grp.totalTime=grp.inspTime+grp.walkTime;
+        grp.fromCache=msg.fromCache;
+      }
+      else if(msg.type==='warn'){
+        console.warn('[Worker]', msg.msg);
+      }
+      else if(msg.type==='all_done'){
+        activeWorker.terminate(); activeWorker=null;
+        setCacheStatus(`Caché D1: ${msg.fromCache} desde D1 · ${msg.fromOSRM} nuevos de OSRM.`);
+        resolve();
+      }
+      else if(msg.type==='fatal'){
+        activeWorker.terminate(); activeWorker=null;
+        reject(new Error(msg.message));
+      }
+    };
+
+    activeWorker.onerror=function(err){
+      activeWorker.terminate(); activeWorker=null;
+      reject(new Error('Worker error: '+err.message));
+    };
+
+    // Serializar grupos (solo datos, sin funciones)
+    const groupsData=groups.map(g=>({
+      id:g.id, inspTime:g.inspTime,
+      trafo:{idApoyo:g.trafo.idApoyo,idTrafo:g.trafo.idTrafo,lat:g.trafo.lat,lon:g.trafo.lon,clientes:g.trafo.clientes},
+      apoyos:g.apoyos.map(a=>({idApoyo:a.idApoyo,idTrafo:a.idTrafo,lat:a.lat,lon:a.lon,clientes:a.clientes}))
+    }));
+
+    activeWorker.postMessage({type:'start', groups:groupsData, batchId, apiBase, force});
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LEAFLET — agregar markers en lotes para no congelar la UI
+// ══════════════════════════════════════════════════════════════
+function addMarkersChunked(markerFns, onDone, chunkSize=30){
+  const layers=[];
+  let i=0;
+  function step(){
+    const end=Math.min(i+chunkSize, markerFns.length);
+    while(i<end){
+      const layer=markerFns[i]();
+      if(layer) layers.push(layer);
+      i++;
+    }
+    if(i<markerFns.length) requestAnimationFrame(step);
+    else onDone(layers);
+  }
+  requestAnimationFrame(step);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1219,15 +960,13 @@ function buildHaversineMatrix(pts, trafficFactor){
 async function calculateAll(){
   if(!GROUPS.length){toast('Cargá un CSV primero.');return;}
   const cfg=getConfig();
-
-  // Read & apply base from UI
   const baseLat=parseFloat(document.getElementById('cfg-blat').value);
   const baseLon=parseFloat(document.getElementById('cfg-blon').value);
   if(isNaN(baseLat)||isNaN(baseLon)){toast('Coordenadas de base inválidas.');return;}
   BASE_PT={lat:baseLat,lon:baseLon};
   baseMarker.setLatLng([baseLat,baseLon]);
 
-  // Clear map
+  // Clear
   gRouteLayers.forEach(rl=>{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>map.removeLayer(m));});
   gRouteLayers=[];
   gPreviewMarkers.forEach(m=>map.removeLayer(m)); gPreviewMarkers=[];
@@ -1239,125 +978,122 @@ async function calculateAll(){
   gRoutes=[]; gSchedules=[];
 
   showLoading(true);
-  setProgress(5,'Conectando con servidor de ruteo...');
+  setProgress(5,'Iniciando...');
 
   try{
-    // allPts: BASE + one point per transformer group
     const allPts=[BASE_PT,...GROUPS.map(g=>({lat:g.trafo.lat,lon:g.trafo.lon}))];
     gAllPts=allPts;
 
-    setProgress(15,'Consultando D1 y calculando rutas faltantes con OSRM walking...');
+    // Calcular tiempos de inspección (instantáneo, sin walking)
     computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
-    await startServerBatch();
-    setCacheStatus(forceRecalculateOSRM ? 'Caché OSRM D1: ignorado para recálculo.' : 'Caché OSRM D1: consultando rutas guardadas...');
-    await computeAllGroupWalking(GROUPS,(done,total,msg)=>{
-      const pct = total ? 15+Math.round((done/total)*20) : 15;
-      setProgress(pct, msg || `Rutas a pie OSRM: ${done}/${total} transformadores...`);
-    });
 
-    setProgress(38,'Calculando matriz de distancias vehiculares...');
-    // Use haversine matrix — no API limit, works for any number of points
-    // Traffic factor already embedded in the matrix (seconds)
-    const scaledDur=buildHaversineMatrix(allPts,cfg.trafficFactor);
-    // Approximate distances for summary (km)
-    const distMatrix=allPts.map((p,i)=>allPts.map((q,j)=>i===j?0:haversineKm(p.lat,p.lon,q.lat,q.lon)*1.35*1000));
+    // Registrar lote en D1
+    setProgress(10,'Registrando lote en caché D1...');
+    const batch=await startServerBatch();
+    setCacheStatus(forceRecalculateOSRM?'Caché D1: ignorado para recálculo.':'Caché D1: consultando rutas guardadas...');
 
-    setProgress(35,'Agrupando en cuadrillas...');
+    // ── OSRM WALKING EN WEB WORKER ──────────────────────────
+    // El hilo principal queda libre — la UI no se congela
+    setProgress(13,'Lanzando Web Worker para OSRM walking...');
+    await runOSRMWorker(GROUPS, batch.batch_id, forceRecalculateOSRM);
+    // Al llegar aquí, cada GROUPS[i].walkTime y walkOrder ya están completos
+
+    // Matriz haversine para routing vehicular
+    setProgress(38,'Calculando matriz vehicular...');
+    const scaledDur=buildHaversineMatrix(allPts, cfg.trafficFactor);
+
+    // Clustering + TSP vehicular
+    setProgress(45,'Agrupando cuadrillas y optimizando recorrido...');
     const k=Math.min(numRoutes,GROUPS.length);
     const asgn=k===1?new Array(GROUPS.length).fill(0):kMeans(GROUPS.map(g=>g.trafo),k);
-
-    setProgress(50,'Optimizando recorrido...');
     const routes=[];
     for(let ki=0;ki<k;ki++){
-      // Indices into allPts (offset by 1 since BASE=0)
       const clIdx=GROUPS.map((_,i)=>i+1).filter((_,i)=>asgn[i]===ki);
       if(!clIdx.length) continue;
       let idx=nnTSP(scaledDur,clIdx);
       idx=twoOpt(scaledDur,idx);
-      // groupIndices = middle elements (exclude BASE bookends)
-      const groupIndices=idx.slice(1,-1);
-      routes.push({color:ROUTE_COLORS[ki],name:ROUTE_NAMES[ki],sup:SUP_LABELS[ki],ri:ki,
-        indices:idx, groupIndices,
-        points:idx.map(i=>allPts[i])});
+      routes.push({color:ROUTE_COLORS[ki],name:ROUTE_NAMES[ki],sup:SUP_LABELS[ki],ri:ki,indices:idx,groupIndices:idx.slice(1,-1),points:idx.map(i=>allPts[i])});
     }
     gRoutes=routes;
 
+    // OSRM driving geometry por ruta
     let totalDist=0,totalDur=0;
-
     for(let ri=0;ri<routes.length;ri++){
       const route=routes[ri];
-      setProgress(55+ri*(35/routes.length),`Trazando ${route.name} en red vial...`);
+      setProgress(50+ri*(20/routes.length),`Trazando ${route.name} en calles...`);
+      const rd=await osrmDriving(route.points);
+      if(!rd) throw new Error(`OSRM driving sin geometría para ${route.name}`);
+      route.distance=rd.distance; route.duration=rd.duration*cfg.trafficFactor;
+      totalDist+=rd.distance; totalDur+=route.duration;
+      route.geom=rd.geom;
 
-      // Schedule
+      // Schedules
       const sched=buildSchedule(route.groupIndices,scaledDur,cfg);
       gSchedules.push(sched);
+    }
 
-      // Day map for marker coloring
-      const ptDayMap={};
-      sched.forEach(e=>{if(!e.overflow)ptDayMap[e.grpPtIdx]=e.dayIdx;});
+    setProgress(72,'Dibujando mapa en lotes...');
 
-      // Road geometry (driving between transformers)
-      const rd=await osrmRoute(route.points);
-      let lineLayer=null;
-      if(rd){
-        route.distance=rd.distance; route.duration=rd.duration*cfg.trafficFactor;
-        totalDist+=rd.distance; totalDur+=route.duration;
-        lineLayer=L.geoJSON(rd.geom,{style:{color:route.color,weight:4,opacity:.85,lineCap:'round',lineJoin:'round'}}).addTo(map);
-      } else {
-        throw new Error(`OSRM driving no devolvió geometría para ${route.name}`);
-      }
+    // ── DIBUJAR MAPA EN LOTES (no congela la UI) ────────────
+    await new Promise(resolve=>{
+      const allMarkerFns=[];
 
-      // Markers
-      const markerLayers=[];
+      routes.forEach((route,ri)=>{
+        const sched=gSchedules[ri];
+        const ptDayMap={};
+        sched.forEach(e=>{if(!e.overflow)ptDayMap[e.grpPtIdx]=e.dayIdx;});
 
-      // Base
-      const bm=L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:1000}).bindPopup('<b>BASE / Depósito</b>').addTo(map);
-      markerLayers.push(bm);
+        // Línea vehicular (inmediato, es solo 1 polyline)
+        const lineLayer=L.geoJSON(route.geom,{style:{color:route.color,weight:4,opacity:.85,lineCap:'round',lineJoin:'round'}}).addTo(map);
 
-      route.groupIndices.forEach((grpPtIdx,si)=>{
-        const grp=GROUPS[grpPtIdx-1];
-        const dayIdx=ptDayMap[grpPtIdx]??0;
-        const dayColor=DAY_COLORS[dayIdx%DAY_COLORS.length];
+        const markerLayers=[lineLayer];
 
-        // Transformer marker (square icon, day color)
-        const tm=L.marker([grp.trafo.lat,grp.trafo.lon],{icon:mkTrafoIcon(si+1,dayColor),zIndexOffset:600})
-          .bindPopup(`<b>Trafo ${grp.id}</b><br>
-            <span style="color:#94a3b8">${grp.apoyos.length+1} apoyos · ${grp.totalClients} clientes</span><br>
-            <span style="color:#f5a623;font-size:10px">⏱ ${fmtTMin(grp.totalTime)} inspección</span><br>
-            <span style="color:#f5a623;font-size:10px">📅 ${getWorkingDay(dayIdx,cfg.noWeekend).label}</span>`)
-          .addTo(map);
-        markerLayers.push(tm);
-
-        // Apoyo markers in optimized walk order
-        grp.walkOrder.forEach(a=>{
-          const am=L.marker([a.lat,a.lon],{icon:mkApoyoIcon(dayColor),zIndexOffset:500})
-            .bindPopup(`<b>Apoyo ${a.idApoyo}</b><br><span style="color:#94a3b8">${a.clientes} clientes</span>`)
-            .addTo(map);
-          markerLayers.push(am);
+        // Base marker
+        allMarkerFns.push(()=>{
+          const m=L.marker([BASE_PT.lat,BASE_PT.lon],{icon:mkBaseIcon(),zIndexOffset:1000}).bindPopup('<b>BASE / Depósito</b>').addTo(map);
+          markerLayers.push(m);
+          return m;
         });
 
-        // Walking line: no se dibuja automáticamente para no cargar el navegador con cientos de GeoJSON.
-        // La geometría completa queda guardada en D1. En esta versión liviana se dibujan
-        // marcadores + ruta vehicular; los trazos peatonales se deben cargar bajo demanda.
-        if(grp.walkOrder.length>1 && grp.walkGeom){
-          const wl=L.geoJSON(grp.walkGeom,{
-            style:{color:dayColor,weight:2.5,opacity:.8,dashArray:'6,5'}
-          }).addTo(map);
-          markerLayers.push(wl);
-        }
+        route.groupIndices.forEach((grpPtIdx,si)=>{
+          const grp=GROUPS[grpPtIdx-1];
+          const dayIdx=ptDayMap[grpPtIdx]??0;
+          const dayColor=DAY_COLORS[dayIdx%DAY_COLORS.length];
+          const wd=getWorkingDay(dayIdx,cfg.noWeekend);
+
+          // Trafo marker
+          allMarkerFns.push(()=>{
+            const m=L.marker([grp.trafo.lat,grp.trafo.lon],{icon:mkTrafoIcon(si+1,dayColor),zIndexOffset:600})
+              .bindPopup(`<b>Trafo ${grp.id}</b><br><span style="color:#94a3b8">${grp.apoyos.length+1} apoyos · ${grp.totalClients} clientes</span><br><span style="color:#f5a623;font-size:10px">⏱ ${fmtTMin(grp.totalTime)} · 📅 ${wd.label}</span>`)
+              .addTo(map);
+            markerLayers.push(m);
+            return m;
+          });
+
+          // Apoyo markers
+          grp.walkOrder.forEach(a=>{
+            allMarkerFns.push(()=>{
+              const m=L.marker([a.lat,a.lon],{icon:mkApoyoIcon(dayColor),zIndexOffset:500})
+                .bindPopup(`<b>Apoyo ${a.idApoyo}</b><br><span style="color:#94a3b8">${a.clientes} clientes</span>`)
+                .addTo(map);
+              markerLayers.push(m);
+              return m;
+            });
+          });
+        });
+
+        gRouteLayers.push({line:lineLayer,markers:markerLayers,visible:true});
       });
 
-      gRouteLayers.push({line:lineLayer,markers:markerLayers,visible:true});
-    }
+      addMarkersChunked(allMarkerFns, ()=>resolve(), 25);
+    });
 
     setProgress(95,'Generando cronograma...');
 
     // Summary
-    const totalGroups=GROUPS.length;
-    const totalClients=GROUPS.reduce((s,g)=>s+g.totalClients,0);
     const daysUsed=new Set(gSchedules.flat().filter(e=>!e.overflow).map(e=>e.date)).size;
-    document.getElementById('s-trafos').textContent=totalGroups;
-    document.getElementById('s-clients').textContent=totalClients;
+    document.getElementById('s-trafos').textContent=GROUPS.length;
+    document.getElementById('s-clients').textContent=GROUPS.reduce((s,g)=>s+g.totalClients,0);
     document.getElementById('s-days').textContent=daysUsed;
     document.getElementById('s-dist').textContent=fmtKm(totalDist);
     document.getElementById('summary').classList.add('show');
@@ -1367,7 +1103,7 @@ async function calculateAll(){
 
     map.fitBounds([...GROUPS.map(g=>[g.trafo.lat,g.trafo.lon]),[BASE_PT.lat,BASE_PT.lon]],{padding:[30,30]});
     setProgress(100,'¡Listo!');
-    setCacheStatus('Caché OSRM D1: cálculo finalizado.');
+    setCacheStatus('Caché D1: cálculo finalizado.');
     forceRecalculateOSRM=false;
     showLoading(false);
     document.getElementById('export-strip').style.display='block';
@@ -1377,37 +1113,36 @@ async function calculateAll(){
     showLoading(false);
     toast('Error: '+err.message);
     console.error(err);
+    setCacheStatus('Error: '+err.message);
   }
 }
 
 // ══════════════════════════════════════════════════════════════
-//  TOGGLE ROUTE VISIBILITY
+//  TOGGLE VISIBILIDAD
 // ══════════════════════════════════════════════════════════════
 function toggleRoute(ri,btn){
   const rl=gRouteLayers[ri];
   if(!rl) return;
   rl.visible=!rl.visible;
-  if(rl.visible){if(rl.line)map.addLayer(rl.line);rl.markers.forEach(m=>map.addLayer(m));btn.classList.remove('hidden-route');}
-  else{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>map.removeLayer(m));btn.classList.add('hidden-route');}
+  if(rl.visible){if(rl.line)map.addLayer(rl.line);rl.markers.forEach(m=>{try{map.addLayer(m);}catch(e){}});btn.classList.remove('hidden-route');}
+  else{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>{try{map.removeLayer(m);}catch(e){}});btn.classList.add('hidden-route');}
 }
 
 // ══════════════════════════════════════════════════════════════
-//  RENDER: ROUTES PANE
+//  RENDER: RUTAS
 // ══════════════════════════════════════════════════════════════
 function renderRoutesPane(routes,schedules,cfg){
   const pane=document.getElementById('pane-rutas');
   pane.innerHTML='';
   pane.style.cssText='padding:11px;gap:8px;display:flex;flex-direction:column';
 
-  // Visibility strip
   if(routes.length>1){
     const strip=document.createElement('div');
     strip.className='vis-strip';
     routes.forEach((route,ri)=>{
       const btn=document.createElement('button');
       btn.className='vis-btn';
-      btn.style.borderColor=route.color;
-      btn.style.color=route.color;
+      btn.style.borderColor=route.color; btn.style.color=route.color;
       btn.innerHTML=`<span style="width:8px;height:8px;border-radius:50%;background:${route.color};display:inline-block"></span>${route.name}`;
       btn.addEventListener('click',()=>toggleRoute(ri,btn));
       strip.appendChild(btn);
@@ -1415,7 +1150,6 @@ function renderRoutesPane(routes,schedules,cfg){
     pane.appendChild(strip);
   }
 
-  // Day legend
   const allDayIdx=[...new Set(schedules.flat().filter(e=>!e.overflow).map(e=>e.dayIdx))].sort((a,b)=>a-b);
   if(allDayIdx.length>1){
     const legend=document.createElement('div');
@@ -1432,7 +1166,6 @@ function renderRoutesPane(routes,schedules,cfg){
     pane.appendChild(legend);
   }
 
-  // Route cards
   routes.forEach((route,ri)=>{
     const sched=schedules[ri];
     const ptDayMap={};
@@ -1484,14 +1217,12 @@ function renderRoutesPane(routes,schedules,cfg){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  RENDER: SCHEDULE PANE
+//  RENDER: CRONOGRAMA
 // ══════════════════════════════════════════════════════════════
 function renderSchedulePane(routes,schedules,cfg){
   const inner=document.getElementById('sched-inner');
   inner.innerHTML='';
-
-  const dayMap={};
-  const overflows=[];
+  const dayMap={},overflows=[];
   schedules.forEach((sched,ri)=>{
     sched.forEach(e=>{
       if(e.overflow){overflows.push({ri,e});return;}
@@ -1500,12 +1231,10 @@ function renderSchedulePane(routes,schedules,cfg){
     });
   });
 
-  // Sort days
   Object.keys(dayMap).sort().forEach(date=>{
     const{wd,entries}=dayMap[date];
     const byRoute={};
     entries.forEach(({ri,e})=>{if(!byRoute[ri])byRoute[ri]=[];byRoute[ri].push({ri,e});});
-
     const card=document.createElement('div');
     card.className='day-card';
     let html=`<div class="day-hdr"><div class="day-date-txt">${wd.date}</div><div class="day-label-txt">${wd.label}</div></div><div class="day-body">`;
@@ -1515,27 +1244,13 @@ function renderSchedulePane(routes,schedules,cfg){
       const rEntries=byRoute[ri];
       const lastE=rEntries[rEntries.length-1].e;
       const baseRet=lastE.effectiveDep+lastE.retMin;
+      html+=`<div class="sched-sup" style="color:${route.color}"><span style="width:8px;height:8px;border-radius:50%;background:${route.color};display:inline-block"></span>${route.name} · ${route.sup}</div>`;
 
-      html+=`<div class="sched-sup" style="color:${route.color}">
-        <span style="width:8px;height:8px;border-radius:50%;background:${route.color};display:inline-block"></span>
-        ${route.name} · ${route.sup}
-      </div>`;
-
-      rEntries.forEach(({e},ei)=>{
+      rEntries.forEach(({e})=>{
         const grp=GROUPS[e.grpIdx];
         const dc=DAY_COLORS[e.dayIdx%DAY_COLORS.length];
-
-        // Travel row
-        if(e.travelMin>0.5){
-          html+=`<div class="sched-travel">🚗 +${fmtTMin(e.travelMin)} traslado</div>`;
-        }
-
-        // Lunch before
-        if(e.lunchApplied&&e.lunchBefore){
-          html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
-        }
-
-        // Inspection block
+        if(e.travelMin>0.5) html+=`<div class="sched-travel">🚗 +${fmtTMin(e.travelMin)} traslado</div>`;
+        if(e.lunchApplied&&e.lunchBefore) html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
         html+=`<div class="sched-grp">
           <div class="sched-grp-hdr">
             <div class="sched-grp-time" style="color:${route.color}">${minToT(e.arrMin)}</div>
@@ -1550,13 +1265,8 @@ function renderSchedulePane(routes,schedules,cfg){
             <span class="sched-chip walk">🚶 ${fmtTMin(grp.walkTime)}</span>
           </div>
         </div>`;
-
-        // Lunch after
-        if(e.lunchApplied&&!e.lunchBefore){
-          html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
-        }
+        if(e.lunchApplied&&!e.lunchBefore) html+=`<div class="sched-lunch">🍽 ${minToT(e.lunchBreakStart)} – ${minToT(e.lunchBreakEnd)} · Almuerzo</div>`;
       });
-
       html+=`<div class="sched-return">🏠 ${minToT(baseRet)} — Regreso a base</div>`;
     });
 
@@ -1567,16 +1277,9 @@ function renderSchedulePane(routes,schedules,cfg){
 
   if(overflows.length){
     const card=document.createElement('div');
-    card.className='day-card';
-    card.style.borderColor='var(--red)';
-    let html=`<div class="day-hdr" style="background:rgba(239,68,68,.07)">
-      <div class="day-date-txt" style="color:var(--red)">⚠ SIN FECHA</div>
-      <div class="day-label-txt">No calculados — revisar configuración</div>
-    </div><div class="day-body">`;
-    overflows.forEach(({ri,e})=>{
-      const grp=GROUPS[e.grpIdx];
-      html+=`<div class="overflow-row">⚠ Trafo ${grp.id} · ${grp.totalClients} clientes · ${fmtTMin(grp.totalTime)} (${gRoutes[ri].name})</div>`;
-    });
+    card.className='day-card'; card.style.borderColor='var(--red)';
+    let html=`<div class="day-hdr" style="background:rgba(239,68,68,.07)"><div class="day-date-txt" style="color:var(--red)">⚠ SIN FECHA</div><div class="day-label-txt">No calculados</div></div><div class="day-body">`;
+    overflows.forEach(({ri,e})=>{const grp=GROUPS[e.grpIdx];html+=`<div class="overflow-row">⚠ Trafo ${grp.id} · ${grp.totalClients} clientes · ${fmtTMin(grp.totalTime)} (${gRoutes[ri].name})</div>`;});
     html+=`</div>`;
     card.innerHTML=html;
     inner.appendChild(card);
@@ -1589,19 +1292,14 @@ function renderSchedulePane(routes,schedules,cfg){
 function exportCSV(){
   if(!gRoutes.length){toast('Calculá primero.');return;}
   const rows=[['Supervisor','Ruta','Fecha','Día','Nro Orden','ID Transformador','Apoyos Totales','Clientes Totales','Clientes Trafo','Hora Llegada','Fin Inspección','Tiempo Inspección (min)','Tiempo Caminata (min)','Almuerzo','Hora Regreso Base']];
-
   gRoutes.forEach((route,ri)=>{
     const sched=gSchedules[ri];
     const byDay={};
     sched.filter(e=>!e.overflow).forEach(e=>{if(!byDay[e.date])byDay[e.date]=[];byDay[e.date].push(e);});
     let stop=0;
-
     sched.forEach(e=>{
       const grp=GROUPS[e.grpIdx]; stop++;
-      if(e.overflow){
-        rows.push([route.sup,route.name,'SIN FECHA','—',stop,grp.id,grp.apoyos.length+1,grp.totalClients,grp.trafo.clientes,'—','—',grp.inspTime.toFixed(1),grp.walkTime.toFixed(1),'—','—']);
-        return;
-      }
+      if(e.overflow){rows.push([route.sup,route.name,'SIN FECHA','—',stop,grp.id,grp.apoyos.length+1,grp.totalClients,grp.trafo.clientes,'—','—',grp.inspTime.toFixed(1),grp.walkTime.toFixed(1),'—','—']);return;}
       const dayE=byDay[e.date];
       const isLast=dayE&&dayE[dayE.length-1]===e;
       const retBase=isLast?minToT(e.effectiveDep+e.retMin):'';
@@ -1610,7 +1308,6 @@ function exportCSV(){
     });
     rows.push([]);
   });
-
   const csv='\ufeff'+rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const url=URL.createObjectURL(blob);
