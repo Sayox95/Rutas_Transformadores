@@ -629,11 +629,14 @@ async function getCachedWalkingRoute(grp){
     id_trafo:String(grp.id),
     request_hash:requestHash
   });
+  qs.set('include_geom','0');
   const data=await apiJson(`${OSRM_CACHE_API_BASE}/route/get?${qs.toString()}`,{method:'GET'});
   if(!data.found) return null;
   return {
     walkTime:data.route.walk_time_min,
-    walkGeom:data.route.walk_geom,
+    // Importante: no traer walk_geom durante la validación/reanudación.
+    // La geometría completa queda en D1 y solo se carga si se necesita dibujarla.
+    walkGeom:null,
     walkOrder:data.route.walk_order,
     requestHash
   };
@@ -676,7 +679,7 @@ function applyCachedWalkingRoute(grp,cached){
   grp.walkFallback=false;
   grp.walkFallbackReason='';
   grp.walkTime=cached.walkTime;
-  grp.walkGeom=cached.walkGeom;
+  grp.walkGeom=null; // no cargar GeoJSON completo en memoria al reanudar desde D1
   grp.walkOrder=cached.walkOrder;
   grp.totalTime=grp.inspTime+grp.walkTime;
   grp.osrmCached=true;
@@ -785,7 +788,7 @@ async function computeGroupWalking(grp){
   if(!forceRecalculateOSRM){
     try{
       const cached=await getCachedWalkingRoute(grp);
-      if(cached && cached.walkGeom && Array.isArray(cached.walkOrder)){
+      if(cached && Array.isArray(cached.walkOrder)){
         applyCachedWalkingRoute(grp,cached);
         return;
       }
@@ -837,6 +840,9 @@ async function computeGroupWalking(grp){
 
   try{
     await setCachedWalkingRoute(grp);
+    // Liberar la geometría completa después de guardarla en D1.
+    // Evita que muchas rutas GeoJSON queden acumuladas en memoria del navegador.
+    grp.walkGeom=null;
     setCacheStatus(`Caché OSRM D1: guardado Trafo ${grp.id}.`);
   }catch(cacheErr){
     console.warn('No se pudo guardar caché OSRM D1:', cacheErr);
@@ -1330,11 +1336,10 @@ async function calculateAll(){
           markerLayers.push(am);
         });
 
-        // Walking line — use OSRM geometry if available, else straight lines
-        if(grp.walkOrder.length>1){
-          if(!grp.walkGeom){
-            throw new Error(`OSRM walking no devolvió geometría para Trafo ${grp.id}`);
-          }
+        // Walking line: no se dibuja automáticamente para no cargar el navegador con cientos de GeoJSON.
+        // La geometría completa queda guardada en D1. En esta versión liviana se dibujan
+        // marcadores + ruta vehicular; los trazos peatonales se deben cargar bajo demanda.
+        if(grp.walkOrder.length>1 && grp.walkGeom){
           const wl=L.geoJSON(grp.walkGeom,{
             style:{color:dayColor,weight:2.5,opacity:.8,dashArray:'6,5'}
           }).addTo(map);
