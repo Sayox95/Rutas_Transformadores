@@ -12,7 +12,7 @@ function json(data, status = 200) {
 
 export async function onRequestOptions() {
   return json({ ok: true });
-}
+} 
 
 export async function onRequestPost({ request, env }) {
   try {
