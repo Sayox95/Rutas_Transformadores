@@ -502,34 +502,118 @@ function buildGroups(rows){
 
 function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
   groups.forEach(g=>{
-    // Inspection time
-    g.inspTime = inspTrafoMin                         // transformer levantamiento
-      + g.trafo.clientes * inspClientMin              // clients at trafo apoyo
-      + g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0); // clients at each apoyo
-
-    // Walking time between apoyos using haversine (trafo → apoyo1 → apoyo2 → ...)
+    g.inspTime = inspTrafoMin
+      + g.trafo.clientes * inspClientMin
+      + g.apoyos.reduce((s,a)=>s+a.clientes*inspClientMin,0);
+    // walkTime and walkGeom set later by computeAllGroupWalking
+    // Set haversine as initial fallback
     g.walkTime = 0;
-    if(g.apoyos.length > 0){
-      // Nearest-neighbor walk order starting from trafo
-      const pts=[g.trafo,...g.apoyos];
-      const visited=new Set([0]);
-      let cur=0;
-      while(visited.size<pts.length){
-        let best=-1,bd=Infinity;
-        for(let j=0;j<pts.length;j++){
-          if(visited.has(j)) continue;
-          const d=haversineKm(pts[cur].lat,pts[cur].lon,pts[j].lat,pts[j].lon);
-          if(d<bd){bd=d;best=j;}
+    g.walkGeom = null;
+    g.walkOrder = [g.trafo,...g.apoyos]; // default order
+    g.totalTime = g.inspTime;
+  });
+}
+
+// ── OSRM Walking per group ────────────────────────────────────
+// Timeout wrapper — if OSRM doesn't respond, fall back to haversine
+function withTimeout(promise, ms=8000){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),ms))
+  ]);
+}
+
+async function osrmWalkingTable(pts){
+  const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
+  const res=await withTimeout(fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`));
+  if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
+  const d=await res.json();
+  if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
+  return d.durations;
+}
+
+async function osrmWalkingRoute(pts){
+  const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
+  try{
+    const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`));
+    if(!res.ok) return null;
+    const d=await res.json();
+    if(d.code!=='Ok') return null;
+    return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
+  }catch(e){return null;}
+}
+
+async function computeGroupWalking(grp){
+  const pts=[grp.trafo,...grp.apoyos];
+  if(pts.length<=1){
+    grp.walkTime=0; grp.walkGeom=null; grp.walkOrder=pts;
+    grp.totalTime=grp.inspTime; return;
+  }
+  try{
+    // 1. Get walking time matrix for this group's apoyos
+    const mat=await osrmWalkingTable(pts);
+
+    // 2. TSP — NN starting from trafo (index 0)
+    const order=[0];
+    const rem=new Set(pts.map((_,i)=>i).slice(1));
+    while(rem.size>0){
+      const last=order[order.length-1];
+      let best=-1,bd=Infinity;
+      rem.forEach(j=>{const d=mat[last][j];if(d<bd){bd=d;best=j;}});
+      order.push(best); rem.delete(best);
+    }
+
+    // 3. 2-opt improvement
+    let imp=true;
+    while(imp){
+      imp=false;
+      for(let i=1;i<order.length-1;i++){
+        for(let j=i+1;j<order.length;j++){
+          const before=mat[order[i-1]][order[i]]+(j+1<order.length?mat[order[j]][order[j+1]]:0);
+          const after =mat[order[i-1]][order[j]]+(j+1<order.length?mat[order[i]][order[j+1]]:0);
+          if(after<before-0.01){
+            order.splice(i,j-i+1,...order.slice(i,j+1).reverse());
+            imp=true;
+          }
         }
-        g.walkTime+=bd*WALK_SPEED_MIN_PER_KM;
-        visited.add(best);
-        cur=best;
       }
     }
 
-    // Total time at this stop
-    g.totalTime = g.inspTime + g.walkTime;
-  });
+    grp.walkOrder=order.map(i=>pts[i]);
+
+    // 4. Get walking route geometry in optimized order
+    const rd=await osrmWalkingRoute(grp.walkOrder);
+    if(rd){
+      grp.walkTime=rd.duration/60; // convert seconds to minutes
+      grp.walkGeom=rd.geom;
+    } else {
+      // Fallback to haversine if route fails
+      grp.walkTime=0;
+      for(let i=0;i<grp.walkOrder.length-1;i++){
+        grp.walkTime+=haversineKm(grp.walkOrder[i].lat,grp.walkOrder[i].lon,
+          grp.walkOrder[i+1].lat,grp.walkOrder[i+1].lon)*WALK_SPEED_MIN_PER_KM;
+      }
+      grp.walkGeom=null;
+    }
+  } catch(e){
+    // Full fallback to haversine on error
+    grp.walkTime=0;
+    const pts2=[grp.trafo,...grp.apoyos];
+    for(let i=0;i<pts2.length-1;i++){
+      grp.walkTime+=haversineKm(pts2[i].lat,pts2[i].lon,pts2[i+1].lat,pts2[i+1].lon)*WALK_SPEED_MIN_PER_KM;
+    }
+    grp.walkGeom=null; grp.walkOrder=[grp.trafo,...grp.apoyos];
+  }
+  grp.totalTime=grp.inspTime+grp.walkTime;
+}
+
+async function computeAllGroupWalking(groups, onProgress){
+  const BATCH=3;
+  for(let i=0;i<groups.length;i+=BATCH){
+    const batch=groups.slice(i,Math.min(i+BATCH,groups.length));
+    await Promise.all(batch.map(g=>computeGroupWalking(g)));
+    onProgress(i+batch.length, groups.length);
+  }
 }
 
 // ── File upload ───────────────────────────────────────────────
@@ -875,9 +959,6 @@ async function calculateAll(){
   BASE_PT={lat:baseLat,lon:baseLon};
   baseMarker.setLatLng([baseLat,baseLon]);
 
-  // Compute inspection + walking times
-  computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
-
   // Clear map
   gRouteLayers.forEach(rl=>{if(rl.line)map.removeLayer(rl.line);rl.markers.forEach(m=>map.removeLayer(m));});
   gRouteLayers=[];
@@ -897,7 +978,13 @@ async function calculateAll(){
     const allPts=[BASE_PT,...GROUPS.map(g=>({lat:g.trafo.lat,lon:g.trafo.lon}))];
     gAllPts=allPts;
 
-    setProgress(15,'Calculando matriz de distancias...');
+    setProgress(15,'Calculando rutas a pie entre apoyos (OSRM walking)...');
+    computeGroupTimes(GROUPS, cfg.inspTrafoMin, cfg.inspClientMin);
+    await computeAllGroupWalking(GROUPS,(done,total)=>{
+      setProgress(15+Math.round((done/total)*20),`Rutas a pie: ${done}/${total} transformadores...`);
+    });
+
+    setProgress(38,'Calculando matriz de distancias vehiculares...');
     // Use haversine matrix — no API limit, works for any number of points
     // Traffic factor already embedded in the matrix (seconds)
     const scaledDur=buildHaversineMatrix(allPts,cfg.trafficFactor);
@@ -974,31 +1061,27 @@ async function calculateAll(){
           .addTo(map);
         markerLayers.push(tm);
 
-        // Apoyo markers + dashed walking lines
-        const apoyoPts=[grp.trafo,...grp.apoyos];
-        apoyoPts.forEach(a=>{
+        // Apoyo markers in optimized walk order
+        grp.walkOrder.forEach(a=>{
           const am=L.marker([a.lat,a.lon],{icon:mkApoyoIcon(dayColor),zIndexOffset:500})
             .bindPopup(`<b>Apoyo ${a.idApoyo}</b><br><span style="color:#94a3b8">${a.clientes} clientes</span>`)
             .addTo(map);
           markerLayers.push(am);
         });
 
-        // Dashed walking line within group (NN order)
-        if(apoyoPts.length>1){
-          const visited=new Set([0]);
-          let cur=0;
-          const walkCoords=[[apoyoPts[0].lat,apoyoPts[0].lon]];
-          while(visited.size<apoyoPts.length){
-            let best=-1,bd=Infinity;
-            for(let j=0;j<apoyoPts.length;j++){
-              if(visited.has(j)) continue;
-              const d=haversineKm(apoyoPts[cur].lat,apoyoPts[cur].lon,apoyoPts[j].lat,apoyoPts[j].lon);
-              if(d<bd){bd=d;best=j;}
-            }
-            visited.add(best); cur=best;
-            walkCoords.push([apoyoPts[best].lat,apoyoPts[best].lon]);
+        // Walking line — use OSRM geometry if available, else straight lines
+        if(grp.walkOrder.length>1){
+          let wl;
+          if(grp.walkGeom){
+            // Real street geometry from OSRM walking
+            wl=L.geoJSON(grp.walkGeom,{
+              style:{color:dayColor,weight:2.5,opacity:.8,dashArray:'6,5'}
+            }).addTo(map);
+          } else {
+            // Fallback: straight lines between apoyos
+            const walkCoords=grp.walkOrder.map(a=>[a.lat,a.lon]);
+            wl=L.polyline(walkCoords,{color:dayColor,weight:2.5,opacity:.7,dashArray:'6,5'}).addTo(map);
           }
-          const wl=L.polyline(walkCoords,{color:dayColor,weight:2,opacity:.7,dashArray:'5,6'}).addTo(map);
           markerLayers.push(wl);
         }
       });
