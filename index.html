@@ -515,22 +515,38 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
 }
 
 // ── OSRM Walking per group ────────────────────────────────────
+// Retry wrapper — 3 attempts with 3s wait between each
+async function withRetry(fn, attempts=3, waitMs=3000){
+  for(let i=0;i<attempts;i++){
+    try{
+      return await fn();
+    }catch(e){
+      if(i===attempts-1) throw e; // last attempt — rethrow
+      await new Promise(r=>setTimeout(r,waitMs));
+    }
+  }
+}
+
 async function osrmWalkingTable(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  const res=await fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`);
-  if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
-  const d=await res.json();
-  if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
-  return d.durations; // seconds matrix
+  return withRetry(async()=>{
+    const res=await withTimeout(fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`));
+    if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
+    const d=await res.json();
+    if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
+    return d.durations;
+  });
 }
 
 async function osrmWalkingRoute(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-  const res=await fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`);
-  if(!res.ok) return null;
-  const d=await res.json();
-  if(d.code!=='Ok') return null;
-  return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
+  return withRetry(async()=>{
+    const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`));
+    if(!res.ok) throw new Error(`walking route HTTP ${res.status}`);
+    const d=await res.json();
+    if(d.code!=='Ok') throw new Error('OSRM walking route: '+d.message);
+    return{geom:d.routes[0].geometry,duration:d.routes[0].duration};
+  });
 }
 
 async function computeGroupWalking(grp){
@@ -539,66 +555,47 @@ async function computeGroupWalking(grp){
     grp.walkTime=0; grp.walkGeom=null; grp.walkOrder=pts;
     grp.totalTime=grp.inspTime; return;
   }
-  try{
-    // 1. Get walking time matrix for this group's apoyos
-    const mat=await osrmWalkingTable(pts);
 
-    // 2. TSP — NN starting from trafo (index 0)
-    const order=[0];
-    const rem=new Set(pts.map((_,i)=>i).slice(1));
-    while(rem.size>0){
-      const last=order[order.length-1];
-      let best=-1,bd=Infinity;
-      rem.forEach(j=>{const d=mat[last][j];if(d<bd){bd=d;best=j;}});
-      order.push(best); rem.delete(best);
-    }
+  // 1. Get walking time matrix — throws after 3 retries if fails
+  const mat=await osrmWalkingTable(pts);
 
-    // 3. 2-opt improvement
-    let imp=true;
-    while(imp){
-      imp=false;
-      for(let i=1;i<order.length-1;i++){
-        for(let j=i+1;j<order.length;j++){
-          const before=mat[order[i-1]][order[i]]+(j+1<order.length?mat[order[j]][order[j+1]]:0);
-          const after =mat[order[i-1]][order[j]]+(j+1<order.length?mat[order[i]][order[j+1]]:0);
-          if(after<before-0.01){
-            order.splice(i,j-i+1,...order.slice(i,j+1).reverse());
-            imp=true;
-          }
+  // 2. TSP — NN starting from trafo (index 0)
+  const order=[0];
+  const rem=new Set(pts.map((_,i)=>i).slice(1));
+  while(rem.size>0){
+    const last=order[order.length-1];
+    let best=-1,bd=Infinity;
+    rem.forEach(j=>{const d=mat[last][j];if(d<bd){bd=d;best=j;}});
+    order.push(best); rem.delete(best);
+  }
+
+  // 3. 2-opt improvement
+  let imp=true;
+  while(imp){
+    imp=false;
+    for(let i=1;i<order.length-1;i++){
+      for(let j=i+1;j<order.length;j++){
+        const before=mat[order[i-1]][order[i]]+(j+1<order.length?mat[order[j]][order[j+1]]:0);
+        const after =mat[order[i-1]][order[j]]+(j+1<order.length?mat[order[i]][order[j+1]]:0);
+        if(after<before-0.01){
+          order.splice(i,j-i+1,...order.slice(i,j+1).reverse());
+          imp=true;
         }
       }
     }
-
-    grp.walkOrder=order.map(i=>pts[i]);
-
-    // 4. Get walking route geometry in optimized order
-    const rd=await osrmWalkingRoute(grp.walkOrder);
-    if(rd){
-      grp.walkTime=rd.duration/60; // convert seconds to minutes
-      grp.walkGeom=rd.geom;
-    } else {
-      // Fallback to haversine if route fails
-      grp.walkTime=0;
-      for(let i=0;i<grp.walkOrder.length-1;i++){
-        grp.walkTime+=haversineKm(grp.walkOrder[i].lat,grp.walkOrder[i].lon,
-          grp.walkOrder[i+1].lat,grp.walkOrder[i+1].lon)*WALK_SPEED_MIN_PER_KM;
-      }
-      grp.walkGeom=null;
-    }
-  } catch(e){
-    // Full fallback to haversine on error
-    grp.walkTime=0;
-    const pts2=[grp.trafo,...grp.apoyos];
-    for(let i=0;i<pts2.length-1;i++){
-      grp.walkTime+=haversineKm(pts2[i].lat,pts2[i].lon,pts2[i+1].lat,pts2[i+1].lon)*WALK_SPEED_MIN_PER_KM;
-    }
-    grp.walkGeom=null; grp.walkOrder=[grp.trafo,...grp.apoyos];
   }
+
+  grp.walkOrder=order.map(i=>pts[i]);
+
+  // 4. Get walking route geometry — throws after 3 retries if fails
+  const rd=await osrmWalkingRoute(grp.walkOrder);
+  grp.walkTime=rd.duration/60;
+  grp.walkGeom=rd.geom;
   grp.totalTime=grp.inspTime+grp.walkTime;
 }
 
 async function computeAllGroupWalking(groups, onProgress){
-  const BATCH=5;
+  const BATCH=3;
   for(let i=0;i<groups.length;i+=BATCH){
     const batch=groups.slice(i,Math.min(i+BATCH,groups.length));
     await Promise.all(batch.map(g=>computeGroupWalking(g)));
@@ -885,33 +882,36 @@ function buildSchedule(groupIndices, scaledDur, cfg){
 // ══════════════════════════════════════════════════════════════
 //  OSRM — route geometry only
 async function osrmRoute(pts){
-  // Split into chunks of max 25 waypoints to avoid URL limits
-  // For long routes, chain the chunks
   if(pts.length<=25){
     const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
-    const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-    if(!res.ok) return null;
-    const d=await res.json();
-    if(d.code!=='Ok') return null;
-    return{geom:d.routes[0].geometry,distance:d.routes[0].distance,duration:d.routes[0].duration};
+    return withRetry(async()=>{
+      const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`));
+      if(!res.ok) throw new Error(`driving route HTTP ${res.status}`);
+      const d=await res.json();
+      if(d.code!=='Ok') throw new Error('OSRM driving: '+d.message);
+      return{geom:d.routes[0].geometry,distance:d.routes[0].distance,duration:d.routes[0].duration};
+    });
   }
-  // For longer routes, chunk and merge geometries
+  // For longer routes, chunk and merge
   const CHUNK=24;
   let totalDist=0,totalDur=0;
   const allCoords=[];
   for(let i=0;i<pts.length-1;i+=CHUNK){
     const chunk=pts.slice(i,Math.min(i+CHUNK+1,pts.length));
     const coords=chunk.map(p=>`${p.lon},${p.lat}`).join(';');
-    const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-    if(!res.ok) continue;
-    const d=await res.json();
-    if(d.code!=='Ok') continue;
-    totalDist+=d.routes[0].distance;
-    totalDur+=d.routes[0].duration;
-    const coords2=d.routes[0].geometry.coordinates;
-    coords2.forEach(c=>{if(!allCoords.length||JSON.stringify(allCoords[allCoords.length-1])!==JSON.stringify(c))allCoords.push(c);});
+    const rd=await withRetry(async()=>{
+      const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`));
+      if(!res.ok) throw new Error(`driving chunk HTTP ${res.status}`);
+      const d=await res.json();
+      if(d.code!=='Ok') throw new Error('OSRM driving chunk: '+d.message);
+      return d.routes[0];
+    });
+    totalDist+=rd.distance; totalDur+=rd.duration;
+    rd.geometry.coordinates.forEach(c=>{
+      if(!allCoords.length||JSON.stringify(allCoords[allCoords.length-1])!==JSON.stringify(c))
+        allCoords.push(c);
+    });
   }
-  if(!allCoords.length) return null;
   return{geom:{type:'LineString',coordinates:allCoords},distance:totalDist,duration:totalDur};
 }
 
