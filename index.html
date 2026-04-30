@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inspección Transformadores</title>
+<title>Inspección Transformadores - Corregido v2</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -523,6 +523,16 @@ const OSRM_REQUEST_GAP_MS = 350;
 
 function sleep(ms){
   return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+// Backward-compatible wrapper: if any old code path still calls withTimeout(fetch(...)),
+// this prevents ReferenceError and applies a timeout to generic promises.
+function withTimeout(promise, timeoutMs=OSRM_TIMEOUT_MS){
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject)=>{
+    timeoutId = setTimeout(()=>reject(new Error('Timeout consultando OSRM')), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(()=>clearTimeout(timeoutId));
 }
 
 async function fetchWithTimeout(url, options={}, timeoutMs=OSRM_TIMEOUT_MS){
