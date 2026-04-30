@@ -16,22 +16,19 @@ export async function onRequestOptions() {
 
 export async function onRequestPost({ request, env }) {
   try {
-    const body = await request.json();
-    const { batch_id } = body;
+    const { batch_id } = await request.json();
 
     if (!batch_id) {
       return json({ ok: false, error: "batch_id es obligatorio" }, 400);
     }
 
-    await env.DB.prepare(`
-      DELETE FROM osrm_transformador_routes
-      WHERE batch_id = ?
-    `).bind(batch_id).run();
+    await env.DB.prepare(
+      `DELETE FROM osrm_walking WHERE batch_id = ?`
+    ).bind(batch_id).run();
 
-    await env.DB.prepare(`
-      DELETE FROM osrm_batches
-      WHERE batch_id = ?
-    `).bind(batch_id).run();
+    await env.DB.prepare(
+      `DELETE FROM osrm_batches WHERE batch_id = ?`
+    ).bind(batch_id).run();
 
     return json({ ok: true, cleared: true, batch_id });
   } catch (err) {
