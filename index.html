@@ -514,23 +514,55 @@ function computeGroupTimes(groups, inspTrafoMin, inspClientMin){
   });
 }
 
-// ── OSRM Walking per group ────────────────────────────────────
+// ── OSRM helpers ──────────────────────────────────────────────
+// The public OSRM demo server has usage limits and may hang/timeout.
+// Keep calls controlled: timeout every fetch, retry failures, and avoid parallel walking requests.
+const OSRM_TIMEOUT_MS = 20000;
+const OSRM_RETRY_WAIT_MS = 3000;
+const OSRM_REQUEST_GAP_MS = 350;
+
+function sleep(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+async function fetchWithTimeout(url, options={}, timeoutMs=OSRM_TIMEOUT_MS){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), timeoutMs);
+
+  try{
+    return await fetch(url,{
+      ...options,
+      signal: controller.signal
+    });
+  }catch(err){
+    if(err && err.name === 'AbortError'){
+      throw new Error('Timeout consultando OSRM');
+    }
+    throw err;
+  }finally{
+    clearTimeout(timeoutId);
+  }
+}
+
 // Retry wrapper — 3 attempts with 3s wait between each
-async function withRetry(fn, attempts=3, waitMs=3000){
+async function withRetry(fn, attempts=3, waitMs=OSRM_RETRY_WAIT_MS){
+  let lastErr;
   for(let i=0;i<attempts;i++){
     try{
       return await fn();
     }catch(e){
+      lastErr=e;
       if(i===attempts-1) throw e; // last attempt — rethrow
-      await new Promise(r=>setTimeout(r,waitMs));
+      await sleep(waitMs);
     }
   }
+  throw lastErr;
 }
 
 async function osrmWalkingTable(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
   return withRetry(async()=>{
-    const res=await withTimeout(fetch(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`));
+    const res=await fetchWithTimeout(`https://router.project-osrm.org/table/v1/walking/${coords}?annotations=duration`);
     if(!res.ok) throw new Error(`walking table HTTP ${res.status}`);
     const d=await res.json();
     if(d.code!=='Ok') throw new Error('OSRM walking: '+d.message);
@@ -541,7 +573,7 @@ async function osrmWalkingTable(pts){
 async function osrmWalkingRoute(pts){
   const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
   return withRetry(async()=>{
-    const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`));
+    const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/walking/${coords}?overview=full&geometries=geojson`);
     if(!res.ok) throw new Error(`walking route HTTP ${res.status}`);
     const d=await res.json();
     if(d.code!=='Ok') throw new Error('OSRM walking route: '+d.message);
@@ -595,10 +627,14 @@ async function computeGroupWalking(grp){
 }
 
 async function computeAllGroupWalking(groups, onProgress){
-  const BATCH=3;
+  // Public OSRM: process one transformer group at a time to avoid concurrent bursts.
+  const BATCH=1;
   for(let i=0;i<groups.length;i+=BATCH){
     const batch=groups.slice(i,Math.min(i+BATCH,groups.length));
-    await Promise.all(batch.map(g=>computeGroupWalking(g)));
+    for(const g of batch){
+      await computeGroupWalking(g);
+      await sleep(OSRM_REQUEST_GAP_MS);
+    }
     onProgress(i+batch.length, groups.length);
   }
 }
@@ -885,7 +921,7 @@ async function osrmRoute(pts){
   if(pts.length<=25){
     const coords=pts.map(p=>`${p.lon},${p.lat}`).join(';');
     return withRetry(async()=>{
-      const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`));
+      const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
       if(!res.ok) throw new Error(`driving route HTTP ${res.status}`);
       const d=await res.json();
       if(d.code!=='Ok') throw new Error('OSRM driving: '+d.message);
@@ -900,7 +936,7 @@ async function osrmRoute(pts){
     const chunk=pts.slice(i,Math.min(i+CHUNK+1,pts.length));
     const coords=chunk.map(p=>`${p.lon},${p.lat}`).join(';');
     const rd=await withRetry(async()=>{
-      const res=await withTimeout(fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`));
+      const res=await fetchWithTimeout(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
       if(!res.ok) throw new Error(`driving chunk HTTP ${res.status}`);
       const d=await res.json();
       if(d.code!=='Ok') throw new Error('OSRM driving chunk: '+d.message);
